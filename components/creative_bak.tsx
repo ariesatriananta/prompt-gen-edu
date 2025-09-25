@@ -600,7 +600,14 @@ export function DesignaliCreative() {
       >
         <div className="flex h-full flex-col">
 
-          <ScrollArea className="flex-1 px-3 py-2 pt-16">
+          <div className="px-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input type="search" placeholder="Search..." className="w-full rounded-2xl bg-muted pl-9 pr-4 py-2" />
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1 px-3 py-2">
             <div className="space-y-1">
               {sidebarItems.map((item) => (
                 <div key={item.title} className="mb-1">
