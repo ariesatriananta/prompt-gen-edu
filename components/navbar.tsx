@@ -45,17 +45,17 @@ export function Navbar() {
 
         {/* Right: Tools */}
         <div className="flex items-center gap-2 md:gap-4">
-          <nav className="hidden items-center gap-4 text-sm md:flex">
+          {/* <nav className="hidden items-center gap-4 text-sm md:flex">
             <Link href="#features">Fitur</Link>
             <Link href="#pricing">Pricing</Link>
             <Link href="#testimonials">Testimoni</Link>
             <Link href="#contact">Contact</Link>
-          </nav>
+          </nav> */}
 
           <ThemeToggle />
 
           <Button asChild className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-            <Link href="/login">Coba Gratis</Link>
+            <Link href="/login">Login Member</Link>
           </Button>
         </div>
       </div>
