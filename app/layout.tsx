@@ -8,8 +8,12 @@ import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Prompt-gen-edu',
-  description: 'Generator prompt edukasi dengan Next.js + shadcn/ui',
+  title: 'ClassToon - AI & Digital Tools',
+  description:
+    'Toko online SaaS untuk generator prompt edukasi. Template siap pakai, kustomisasi fleksibel, dan hasil konsisten.',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

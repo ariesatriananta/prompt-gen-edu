@@ -20,10 +20,10 @@ export function Navbar() {
                 <div className="flex aspect-square size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 text-white">
                 <Wand2 className="size-5" />
                 </div>
-                <span className="font-semibold">Edu Creative Store</span>
+                <span className="font-semibold">ClassToon</span>
             </Link>
 
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             className="md:hidden"
@@ -40,22 +40,23 @@ export function Navbar() {
             aria-label="Toggle sidebar"
           >
             <PanelLeft className="h-5 w-5" />
-          </Button>
+          </Button> */}
         </div>
 
         {/* Right: Tools */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <nav className="hidden items-center gap-4 text-sm md:flex">
+            <Link href="#features">Fitur</Link>
+            <Link href="#pricing">Pricing</Link>
+            <Link href="#testimonials">Testimoni</Link>
+            <Link href="#contact">Contact</Link>
+          </nav>
 
           <ThemeToggle />
 
-          {/* <Avatar className="h-8 w-8">
-            <AvatarImage src="/placeholder.svg?height=32&width=32" alt="User" />
-            <AvatarFallback>PG</AvatarFallback>
-          </Avatar> */}
-
-            <Button className="rounded-2xl">
-                Sign-In
-            </Button>
+          <Button asChild className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+            <Link href="/login">Coba Gratis</Link>
+          </Button>
         </div>
       </div>
     </div>
