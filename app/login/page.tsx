@@ -1,5 +1,6 @@
 "use client"
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { Wand2, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { toast } from '@/components/ui/use-toast'
+import { createClient } from '@/lib/supabase/client'
 
 const LoginSchema = z.object({
   email: z
@@ -15,11 +17,18 @@ const LoginSchema = z.object({
     .email({ message: 'Format email tidak valid.' }),
   password: z
     .string({ required_error: 'Kata sandi wajib diisi.' })
-    .min(8, { message: 'Kata sandi minimal 8 karakter.' }),
+    .min(1, { message: 'Kata sandi wajib diisi.' }),
   remember: z.boolean().optional(),
 })
 
 export default function LoginPage() {
+  // Jika sudah login, redirect ke home
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) window.location.replace('/')
+    })
+  }, [])
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
     defaultValues: {
@@ -32,12 +41,15 @@ export default function LoginPage() {
 
   const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
     try {
-      // Mock request: ganti dengan fetch('/api/login', { method: 'POST', body: JSON.stringify(values) }) jika ada API
-      await new Promise((r) => setTimeout(r, 1200))
-      if (values.email.includes('fail')) {
-        throw new Error('Email atau kata sandi salah.')
-      }
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      })
+      if (error) throw error
       toast({ title: 'Masuk berhasil', description: `Selamat datang, ${values.email}` })
+      // Redirect ke landing (sidebar aktif via layout ketika sesi ada)
+      window.location.href = '/'
     } catch (err: any) {
       toast({
         variant: 'destructive',
@@ -53,7 +65,7 @@ export default function LoginPage() {
 
       {/* Centered container */}
       <div className="mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div className="w-full max-w-md rounded-3xl border border-white/40 bg-white/80 p-6 shadow-xl backdrop-blur-md">
           <div className="mb-6 flex items-center gap-3">
             <div className="flex aspect-square size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 text-white">
               <Wand2 className="size-5" />
@@ -104,7 +116,7 @@ export default function LoginPage() {
                   />
                   Ingat saya
                 </label>
-                <Link href="#" className="text-indigo-700 underline-offset-4 hover:underline">Lupa sandi?</Link>
+              <Link href="/reset-password" className="text-indigo-700 underline-offset-4 hover:underline">Lupa sandi?</Link>
               </div>
 
               <Button

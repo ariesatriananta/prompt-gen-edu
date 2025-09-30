@@ -1,26 +1,14 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  Home,
-  Grid,
-  FileText,
-  Layers,
-  BookOpen,
-  Users,
-  Bookmark,
-  ChevronDown,
-  Wand2,
-  X,
-  Search,
-  Settings,
-} from "lucide-react"
+import { Home, Grid, ChevronDown, Wand2, X, Search, Settings } from "lucide-react"
 
 type SidebarGroup = {
   title: string
@@ -33,72 +21,25 @@ type SidebarGroup = {
 const sidebarItems: SidebarGroup[] = [
   { title: "Home", icon: <Home />, isActive: true },
   {
-    title: "Apps",
+    title: "Tools",
     icon: <Grid />,
-    badge: "2",
     items: [
-      { title: "All Apps", url: "#" },
-      { title: "Recent", url: "#" },
-      { title: "Updates", url: "#", badge: "2" },
-      { title: "Installed", url: "#" },
+      { title: "Eduprompt", url: "#" },
+      { title: "Motionprompt", url: "#" },
+      { title: "Storyprompt", url: "#" },
+      { title: "Visiprompt", url: "#" },
+      { title: "QuizPrompt", url: "#" },
+      { title: "PlayPrompt", url: "#" },
     ],
   },
-  {
-    title: "Files",
-    icon: <FileText />,
-    items: [
-      { title: "Recent", url: "#" },
-      { title: "Shared with me", url: "#", badge: "3" },
-      { title: "Favorites", url: "#" },
-      { title: "Trash", url: "#" },
-    ],
-  },
-  {
-    title: "Projects",
-    icon: <Layers />,
-    badge: "4",
-    items: [
-      { title: "Active Projects", url: "#", badge: "4" },
-      { title: "Archived", url: "#" },
-      { title: "Templates", url: "#" },
-    ],
-  },
-  {
-    title: "Learn",
-    icon: <BookOpen />,
-    items: [
-      { title: "Tutorials", url: "#" },
-      { title: "Courses", url: "#" },
-      { title: "Webinars", url: "#" },
-      { title: "Resources", url: "#" },
-    ],
-  },
-  {
-    title: "Community",
-    icon: <Users />,
-    items: [
-      { title: "Explore", url: "#" },
-      { title: "Following", url: "#" },
-      { title: "Challenges", url: "#" },
-      { title: "Events", url: "#" },
-    ],
-  },
-  {
-    title: "Resources",
-    icon: <Bookmark />,
-    items: [
-      { title: "Stock Photos", url: "#" },
-      { title: "Fonts", url: "#" },
-      { title: "Icons", url: "#" },
-      { title: "Templates", url: "#" },
-    ],
-  },
+  { title: "User Management", icon: <Settings />, items: [{ title: "Open", url: "/admin/users" }] },
 ]
 
 export function Sidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
+  const pathname = usePathname()
 
   useEffect(() => {
     const onToggleSidebar = () => setSidebarOpen((prev) => !prev)
@@ -113,6 +54,15 @@ export function Sidebar() {
 
   const toggleExpanded = (title: string) =>
     setExpandedItems((prev) => ({ ...prev, [title]: !prev[title] }))
+
+  const isItemActive = (item: SidebarGroup) => {
+    if (item.title === "Home") return pathname === "/"
+    if (item.title === "User Management") return pathname.startsWith("/admin/users")
+    if (item.items && item.items.length) {
+      return item.items.some((s) => s.url && s.url !== "#" && pathname.startsWith(s.url))
+    }
+    return false
+  }
 
   return (
     <>
@@ -158,9 +108,17 @@ export function Sidebar() {
                   <button
                     className={cn(
                       "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium",
-                      item.isActive ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                      isItemActive(item) ? "bg-primary/10 text-primary" : "hover:bg-muted",
                     )}
-                    onClick={() => item.items && toggleExpanded(item.title)}
+                    onClick={() => {
+                      if (item.title === 'Home') {
+                        window.location.href = '/'
+                      } else if (item.title === 'User Management') {
+                        window.location.href = '/admin/users'
+                      } else if (item.items) {
+                        toggleExpanded(item.title)
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       {item.icon}
@@ -177,7 +135,16 @@ export function Sidebar() {
                   {item.items && expandedItems[item.title] && (
                     <div className="mt-1 ml-6 space-y-1 border-l pl-3">
                       {item.items.map((subItem) => (
-                        <a key={subItem.title} href={subItem.url} className="block rounded-xl px-2 py-1 text-sm hover:bg-muted">
+                        <a
+                          key={subItem.title}
+                          href={subItem.url || '#'}
+                          className={cn(
+                            "block rounded-xl px-2 py-1 text-sm hover:bg-muted",
+                            subItem.url && subItem.url !== '#' && pathname.startsWith(subItem.url)
+                              ? "text-primary font-medium"
+                              : undefined,
+                          )}
+                        >
                           {subItem.title}
                           {subItem.badge && (
                             <Badge variant="outline" className="ml-2 rounded-full px-2 py-0.5 text-xs">
@@ -229,9 +196,17 @@ export function Sidebar() {
                   <button
                     className={cn(
                       "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium",
-                      item.isActive ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                      isItemActive(item) ? "bg-primary/10 text-primary" : "hover:bg-muted",
                     )}
-                    onClick={() => item.items && toggleExpanded(item.title)}
+                    onClick={() => {
+                      if (item.title === 'Home') {
+                        window.location.href = '/'
+                      } else if (item.title === 'User Management') {
+                        window.location.href = '/admin/users'
+                      } else if (item.items) {
+                        toggleExpanded(item.title)
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       {item.icon}
@@ -252,7 +227,16 @@ export function Sidebar() {
                   {item.items && expandedItems[item.title] && (
                     <div className="mt-1 ml-6 space-y-1 border-l pl-3">
                       {item.items.map((subItem) => (
-                        <a key={subItem.title} href={subItem.url} className="block rounded-xl px-2 py-1 text-sm hover:bg-muted">
+                        <a
+                          key={subItem.title}
+                          href={subItem.url || '#'}
+                          className={cn(
+                            "block rounded-xl px-2 py-1 text-sm hover:bg-muted",
+                            subItem.url && subItem.url !== '#' && pathname.startsWith(subItem.url)
+                              ? "text-primary font-medium"
+                              : undefined,
+                          )}
+                        >
                           {subItem.title}
                           {subItem.badge && (
                             <Badge variant="outline" className="ml-2 rounded-full px-2 py-0.5 text-xs">
