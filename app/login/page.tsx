@@ -12,58 +12,45 @@ import { toast } from '@/components/ui/use-toast'
 import { createClient } from '@/lib/supabase/client'
 
 const LoginSchema = z.object({
-  email: z
-    .string({ required_error: 'Email wajib diisi.' })
-    .email({ message: 'Format email tidak valid.' }),
-  password: z
-    .string({ required_error: 'Kata sandi wajib diisi.' })
-    .min(1, { message: 'Kata sandi wajib diisi.' }),
+  email: z.string({ required_error: 'Email wajib diisi.' }).email({ message: 'Format email tidak valid.' }),
+  password: z.string({ required_error: 'Kata sandi wajib diisi.' }).min(1, { message: 'Kata sandi wajib diisi.' }),
   remember: z.boolean().optional(),
 })
 
 export default function LoginPage() {
-  // Jika sudah login, redirect ke home
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) window.location.replace('/')
     })
   }, [])
+
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      remember: false,
-    },
+    defaultValues: { email: '', password: '', remember: false },
     mode: 'onTouched',
   })
 
   const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      })
+      const { error } = await supabase.auth.signInWithPassword({ email: values.email, password: values.password })
       if (error) throw error
       toast({ title: 'Masuk berhasil', description: `Selamat datang, ${values.email}` })
-      // Redirect ke landing (sidebar aktif via layout ketika sesi ada)
       window.location.href = '/'
     } catch (err: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Login gagal',
-        description: err?.message ?? 'Terjadi kesalahan pada server.',
-      })
+      const rawMsg = String(err?.message ?? '')
+      const msg = rawMsg.toLowerCase().includes('invalid') ? 'Email atau kata sandi salah.' : rawMsg || 'Terjadi kesalahan pada server.'
+      form.setError('password', { type: 'server', message: msg })
+      // @ts-ignore
+      if (form.setFocus) form.setFocus('password')
+      toast({ variant: 'destructive', title: 'Login gagal', description: msg })
     }
   }
+
   return (
     <main className="relative overflow-hidden">
-      {/* Background gradasi dengan aksen ungu-biru */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-purple-700/60 via-indigo-700/60 to-blue-700/60" />
-
-      {/* Centered container */}
       <div className="mx-auto flex min-h-[calc(100vh-56px)] max-w-6xl items-center justify-center px-4 py-10">
         <div className="w-full max-w-md rounded-3xl border border-white/40 bg-white/80 p-6 shadow-xl backdrop-blur-md">
           <div className="mb-6 flex items-center gap-3">
@@ -99,7 +86,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Kata sandi</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" className="bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-slate-200" {...field} />
+                      <Input type="password" placeholder="********" className="bg-white text-slate-900 placeholder:text-slate-400 border-slate-200 focus-visible:ring-slate-200" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -116,7 +103,7 @@ export default function LoginPage() {
                   />
                   Ingat saya
                 </label>
-              <Link href="/reset-password" className="text-indigo-700 underline-offset-4 hover:underline">Lupa sandi?</Link>
+                <Link href="/reset-password" className="text-indigo-700 underline-offset-4 hover:underline">Lupa sandi?</Link>
               </div>
 
               <Button
@@ -145,3 +132,4 @@ export default function LoginPage() {
     </main>
   )
 }
+
