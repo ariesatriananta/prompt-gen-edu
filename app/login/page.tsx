@@ -123,10 +123,10 @@ export default function LoginPage() {
             </form>
           </Form>
 
-          <p className="mt-4 text-center text-sm text-slate-600">
+          {/* <p className="mt-4 text-center text-sm text-slate-600">
             Belum punya akun?{' '}
             <Link href="#" className="text-indigo-700 underline-offset-4 hover:underline">Daftar</Link>
-          </p>
+          </p> */}
         </div>
       </div>
     </main>

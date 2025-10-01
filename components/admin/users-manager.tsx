@@ -106,9 +106,6 @@ export default function UsersManager({
           ))}
         </tbody>
       </table>
-      <p className="p-3 text-xs text-muted-foreground">
-        Catatan: Penambahan user baru dilakukan melalui proses signup. Setelah user mendaftar, data akan muncul di daftar ini.
-      </p>
     </div>
   )
 }
