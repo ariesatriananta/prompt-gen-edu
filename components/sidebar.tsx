@@ -24,12 +24,12 @@ const sidebarItems: SidebarGroup[] = [
     title: "Tools",
     icon: <Grid />,
     items: [
-      { title: "Eduprompt", url: "#" },
-      { title: "Motionprompt", url: "#" },
-      { title: "Storyprompt", url: "#" },
-      { title: "Visiprompt", url: "#" },
-      { title: "QuizPrompt", url: "#" },
-      { title: "PlayPrompt", url: "#" },
+        { title: "Motionprompt", url: "/tools/motionprompt" },
+        { title: "Eduprompt", url: "/tools/eduprompt" },
+        { title: "Storyprompt", url: "/tools/storyprompt" },
+        { title: "Visiprompt", url: "/tools/visiprompt" },
+        { title: "QuizPrompt", url: "/tools/quizprompt" },
+        { title: "PlayPrompt", url: "/tools/playprompt" },
     ],
   },
   { title: "User Management", icon: <Settings />, items: [{ title: "Open", url: "/admin/users" }] },
@@ -63,6 +63,13 @@ export function Sidebar() {
     }
     return false
   }
+
+  // Auto-expand Tools when visiting any tools/* path
+  useEffect(() => {
+    if (pathname?.startsWith('/tools')) {
+      setExpandedItems((prev) => ({ ...prev, ['Tools']: true }))
+    }
+  }, [pathname])
 
   return (
     <>
@@ -108,7 +115,11 @@ export function Sidebar() {
                   <button
                     className={cn(
                       "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium",
-                      isItemActive(item) ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                      item.title === 'Tools'
+                        ? undefined // parent Tools: no hover style
+                        : isItemActive(item)
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted",
                     )}
                     onClick={() => {
                       if (item.title === 'Home') {
@@ -141,7 +152,7 @@ export function Sidebar() {
                           className={cn(
                             "block rounded-xl px-2 py-1 text-sm hover:bg-muted",
                             subItem.url && subItem.url !== '#' && pathname.startsWith(subItem.url)
-                              ? "text-primary font-medium"
+                              ? "bg-primary/10 text-primary font-medium"
                               : undefined,
                           )}
                         >
@@ -196,7 +207,11 @@ export function Sidebar() {
                   <button
                     className={cn(
                       "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium",
-                      isItemActive(item) ? "bg-primary/10 text-primary" : "hover:bg-muted",
+                      item.title === 'Tools'
+                        ? undefined // parent Tools: no hover style
+                        : isItemActive(item)
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted",
                     )}
                     onClick={() => {
                       if (item.title === 'Home') {
@@ -233,7 +248,7 @@ export function Sidebar() {
                           className={cn(
                             "block rounded-xl px-2 py-1 text-sm hover:bg-muted",
                             subItem.url && subItem.url !== '#' && pathname.startsWith(subItem.url)
-                              ? "text-primary font-medium"
+                              ? "bg-primary/10 text-primary font-medium"
                               : undefined,
                           )}
                         >

@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Navbar } from '@/components/navbar'
 import { FlashToaster } from '@/components/flash-toaster'
+import PageOverlay from '@/components/page-overlay'
 import { Sidebar } from '@/components/sidebar'
 import { ContentWrapper } from '@/components/content-wrapper'
 import { createClient } from '@/lib/supabase/server'
@@ -42,19 +43,22 @@ export default async function RootLayout({
     <html lang="id" suppressHydrationWarning>
       <head>
         <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
+                html {
+                font-family: ${GeistSans.style.fontFamily};
+                --font-sans: ${GeistSans.variable};
+                --font-mono: ${GeistMono.variable};
+                }
         `}</style>
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <Navbar initialUser={user ? { id: user.id, email: user.email ?? undefined } : undefined} initialProfile={profile ?? undefined} />
           <FlashToaster />
+          {/* Client-side short overlay for very fast transitions */}
+          
           {user ? <Sidebar /> : null}
           <ContentWrapper enabled={!!user}>{children}</ContentWrapper>
+          <PageOverlay />
           <Toaster />
         </ThemeProvider>
         <Analytics />

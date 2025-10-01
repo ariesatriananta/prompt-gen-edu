@@ -1,14 +1,13 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Wand2, Cloud, MessageSquare, Bell, Menu, PanelLeft, User, Loader2 } from "lucide-react"
+import { Wand2, Menu, PanelLeft, User, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+ 
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Plus } from "lucide-react"
+ 
 import { createClient } from "@/lib/supabase/client"
 import {
   DropdownMenu,
@@ -163,7 +162,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
                     {loggingOut ? (
                       <span className="inline-flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Keluar…
+                        Keluar...
                       </span>
                     ) : (
                       'Logout'
@@ -182,3 +181,10 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
     </div>
   )
 }
+
+
+
+
+
+
+
