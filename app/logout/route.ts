@@ -5,7 +5,7 @@ import { cookies } from 'next/headers'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const res = NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'))
+  const res = NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'))
 
   const cookieStore: any = await (cookies() as any)
   const supabase = createServerClient(
@@ -32,4 +32,3 @@ export async function GET() {
 
   return res
 }
-

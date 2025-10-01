@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Navbar } from '@/components/navbar'
+import { FlashToaster } from '@/components/flash-toaster'
 import { Sidebar } from '@/components/sidebar'
 import { ContentWrapper } from '@/components/content-wrapper'
 import { createClient } from '@/lib/supabase/server'
@@ -51,6 +52,7 @@ html {
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <Navbar initialUser={user ? { id: user.id, email: user.email ?? undefined } : undefined} initialProfile={profile ?? undefined} />
+          <FlashToaster />
           {user ? <Sidebar /> : null}
           <ContentWrapper enabled={!!user}>{children}</ContentWrapper>
           <Toaster />
