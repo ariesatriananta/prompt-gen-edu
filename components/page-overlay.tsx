@@ -8,6 +8,7 @@ export default function PageOverlay() {
   const [visible, setVisible] = useState(false)
   const lastPath = useRef<string | null>(null)
   const awaitingNav = useRef(false)
+  const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Show immediately when user clicks internal links
   useEffect(() => {
@@ -22,10 +23,18 @@ export default function PageOverlay() {
       try {
         const url = new URL(href, window.location.href)
         if (url.origin !== window.location.origin) return
+        // Jika menuju ke route yang sama (tanpa perubahan pathname/search), jangan tampilkan overlay
+        if (url.pathname === window.location.pathname && url.search === window.location.search) return
       } catch {}
       awaitingNav.current = true
       lastPath.current = pathname
       setVisible(true)
+      if (safetyTimer.current) clearTimeout(safetyTimer.current)
+      // Safety: auto-hide jika tidak terjadi perubahan path (navigasi batal/ditolak)
+      safetyTimer.current = setTimeout(() => {
+        awaitingNav.current = false
+        setVisible(false)
+      }, 1500)
     }
     document.addEventListener('click', onClick, { capture: true })
     return () => document.removeEventListener('click', onClick, { capture: true } as any)
@@ -37,6 +46,10 @@ export default function PageOverlay() {
     if (lastPath.current !== null && pathname !== lastPath.current) {
       // Give the new page a frame to paint, then hide overlay
       const id = requestAnimationFrame(() => setVisible(false))
+      if (safetyTimer.current) {
+        clearTimeout(safetyTimer.current)
+        safetyTimer.current = null
+      }
       awaitingNav.current = false
       return () => cancelAnimationFrame(id)
     }
@@ -52,4 +65,3 @@ export default function PageOverlay() {
     </div>
   )
 }
-
