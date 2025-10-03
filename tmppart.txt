@@ -1,0 +1,19 @@
+                <label className="mb-2 block text-sm font-medium">7. Jumlah Adegan</label>
+                <Input type="number" min={2} max={10} value={sceneCount} onChange={(e) => setSceneCount(parseInt(e.target.value || '3', 10))} disabled={loading} />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">8. Hindari Elemen Ini (Opsional)</label>
+                <Textarea rows={2} value={negative} onChange={(e) => setNegative(e.target.value)} placeholder="Contoh: hindari teks, warna monoton" disabled={loading} />
+              </div>
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                <Button type="button" onClick={handleGenerate} className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Film className="mr-2 h-4 w-4" />} Buat Prompt
+                </Button>
+                <Button type="button" onClick={handleRandomIdea} variant="secondary" className="rounded-2xl" disabled={loading}>
+                  <Plus className="mr-2 h-4 w-4" /> Ide Acak
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-3">

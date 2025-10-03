@@ -1,0 +1,25 @@
+              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center pt-4">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full sm:w-auto min-w-[220px] rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                  onClick={() => toast({ title: 'Belum tersedia', description: 'Fitur Simpan Prompt belum diimplementasikan.' })}
+                >
+                  <Download className="mr-2 h-5 w-5" />
+                  <span className="text-base">Simpan Prompt</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="secondary"
+                  className="w-full sm:w-auto min-w-[220px] rounded-2xl"
+                  onClick={() => toast({ title: 'Belum tersedia', description: 'Riwayat Prompt belum diimplementasikan.' })}
+                >
+                  <History className="mr-2 h-5 w-5" />
+                  <span className="text-base">Riwayat Prompt</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+

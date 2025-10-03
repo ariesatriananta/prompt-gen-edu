@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -7,11 +7,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-// Alert dihilangkan; gunakan toast/snackbar saja untuk error
-// Gunakan sumber toast yang sama dengan Toaster (hooks/use-toast)
-import { toast } from '@/hooks/use-toast'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { toast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
-import { Loader2, Film, ImageIcon, Plus, Download, History, RotateCcw } from 'lucide-react'
+import { Loader2, Film, ImageIcon, Plus, Download, History } from 'lucide-react'
 
 type SceneDetail = {
   scene: number
@@ -62,7 +61,7 @@ export default function MotionpromptPage() {
   const [sceneCount, setSceneCount] = useState(3)
   const [negative, setNegative] = useState('')
   const [loading, setLoading] = useState(false)
-  // Tidak menyimpan error di state; tampilkan via toast/snackbar saja
+  const [error, setError] = useState<string | null>(null)
   const [scenes, setScenes] = useState<SceneDetail[]>([])
   const [totalRequested, setTotalRequested] = useState(3)
   const [aspectRatio] = useState('16:9')
@@ -81,10 +80,6 @@ export default function MotionpromptPage() {
     const json = await res.json()
     if (!res.ok) throw new Error(json.error || 'API error')
     return json.text as string
-  }
-
-  const showError = (message: string) => {
-    toast({ variant: 'destructive', title: 'Terjadi Kesalahan', description: message })
   }
 
   const buildGeneratePrompt = (start: number, num: number) => {
@@ -114,16 +109,16 @@ OUTPUT_FORMAT: Strict JSON only.
   }
 
   const handleGenerate = async () => {
-    if (!learningObjective.trim()) return showError('Tujuan Pembelajaran wajib diisi.')
-    if (!topic.trim()) return showError('Materi Pembelajaran wajib diisi.')
+    if (!learningObjective.trim()) return toast({ variant: 'destructive', title: 'Lengkapi data', description: 'Tujuan Pembelajaran wajib diisi.' })
+    if (!topic.trim()) return toast({ variant: 'destructive', title: 'Lengkapi data', description: 'Materi Pembelajaran wajib diisi.' })
     setScenes([])
     setTotalRequested(sceneCount)
     setLoading(true)
     try {
       const ok = await fetchScenes(1, Math.min(3, sceneCount))
-      if (!ok) showError('AI tidak mengembalikan hasil.')
+      if (!ok) toast({ variant: 'destructive', title: 'Gagal', description: 'AI tidak mengembalikan hasil.' })
     } catch (e: any) {
-      showError(e?.message || 'Gagal menghubungi AI.')
+      toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Gagal menghubungi AI.' })
     } finally {
       setLoading(false)
     }
@@ -136,22 +131,20 @@ OUTPUT_FORMAT: Strict JSON only.
     setLoading(true)
     try {
       await fetchScenes(nextStart, Math.min(3, remaining))
-    } catch (e: any) {
-      showError(e?.message || 'Gagal memuat scene berikutnya.')
     } finally {
       setLoading(false)
     }
   }
 
   const handleRandomIdea = async () => {
-    if (!topic.trim()) return showError('Isi Materi Pembelajaran terlebih dahulu.')
+    if (!topic.trim()) return toast({ variant: 'destructive', title: 'Lengkapi data', description: 'Isi Materi Pembelajaran terlebih dahulu.' })
     const p = `TASK: Generate one creative story idea (max 20 words). TOPIC: "${topic}". GRADE: ${grade}.`
     setLoading(true)
     try {
       const text = await callApi(p)
       setStory((text || '').trim())
     } catch (e: any) {
-      showError(e?.message || 'Gagal menghubungi AI.')
+      toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Gagal menghubungi AI.' })
     } finally {
       setLoading(false)
     }
@@ -170,24 +163,6 @@ OUTPUT_FORMAT: Strict JSON only.
     setImageOpen(true)
   }
 
-  const handleReset = () => {
-    setSubject('IPA')
-    setGrade('PAUD/TK')
-    setStyle('3D Animation')
-    setLearningObjective('')
-    setTopic('')
-    setStory('')
-    setSceneCount(3)
-    setNegative('')
-    setScenes([])
-    setTotalRequested(3)
-    setDetailOpen(false)
-    setDetailScene(null)
-    setImageOpen(false)
-    setImagePrompt('')
-    toast({ title: 'Form direset', description: 'Input dan hasil telah dibersihkan.' })
-  }
-
 
   return (
     <section className="relative">
@@ -199,7 +174,14 @@ OUTPUT_FORMAT: Strict JSON only.
           </div>
           <p className="mt-3 text-muted-foreground">Buat naskah scene edukasi untuk anak.</p>
         </div>
-        {/* Alert inline dihapus; error akan muncul via toast/snackbar */}
+        {error ? (
+          <div className="mx-auto mb-6 max-w-3xl">
+            <Alert variant="destructive" className="rounded-2xl">
+              <AlertTitle>Terjadi Kesalahan</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
 
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-2">
@@ -251,31 +233,12 @@ OUTPUT_FORMAT: Strict JSON only.
                 <label className="mb-2 block text-sm font-medium">8. Hindari Elemen Ini (Opsional)</label>
                 <Textarea rows={2} value={negative} onChange={(e) => setNegative(e.target.value)} placeholder="Contoh: hindari teks, warna monoton" disabled={loading} />
               </div>
-              <div className="flex flex-col items-stretch gap-3 pt-2">
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={handleGenerate}
-                  className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    <Film className="mr-2 h-5 w-5" />
-                  )}
-                  <span className="text-base">Buat Prompt</span>
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+                <Button onClick={handleGenerate} className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Film className="mr-2 h-4 w-4" />} Buat Prompt
                 </Button>
-                <Button
-                  type="button"
-                  size="lg"
-                  onClick={handleRandomIdea}
-                  variant="secondary"
-                  className="w-full rounded-2xl"
-                  disabled={loading}
-                >
-                  <Plus className="mr-2 h-5 w-5" />
-                  <span className="text-base">Ide Acak</span>
+                <Button onClick={handleRandomIdea} variant="secondary" className="rounded-2xl" disabled={loading}>
+                  <Plus className="mr-2 h-4 w-4" /> Ide Acak
                 </Button>
               </div>
             </CardContent>
@@ -285,139 +248,3 @@ OUTPUT_FORMAT: Strict JSON only.
             <CardHeader>
               <CardTitle>Hasil Prompt Detail</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <Stat label="Scene" value={scenes.length ? String(scenes.length) : '-'} />
-                <Stat label="Estimasi" value={scenes.length ? `${scenes.length * 8} dtk` : '-'} />
-                <Stat label="Mapel" value={subject || '-'} />
-                <Stat label="Jenjang" value={grade || '-'} />
-              </div>
-              <Separator />
-              {!loading && scenes.length === 0 ? (
-                <div className="py-16 text-center text-muted-foreground">
-                  <div className="mb-2 inline-flex px-3 py-1 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">Siap memulai</div>
-                  <div>Atur parameter di panel kiri, lalu klik Buat Prompt.</div>
-                </div>
-              ) : null}
-              {loading ? (
-                <div className="py-16 text-center">
-                  <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-                  <div className="mt-4 text-muted-foreground">AI sedang menyusun materi...</div>
-                </div>
-              ) : null}
-              {scenes.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2 ">
-                  {scenes.map((s) => (
-                    <div key={s.scene} className="rounded-2xl border bg-card p-4 shadow-sm bg-gradient-to-b from-purple-600/15 via-blue-600/10 to-background">
-                      <div className="mb-2 text-primary"><Film className="inline h-5 w-5" /></div>
-                      <h3 className="text-lg font-semibold">Scene {s.scene}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">Durasi 8 Detik</p>
-                      <div className="mt-4 flex gap-2">
-                        <Button variant="default" className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={() => { setDetailScene(s); setDetailOpen(true) }}>Lihat Prompt</Button>
-                        <Button variant="outline" className="flex-1 rounded-xl" onClick={() => openImagePrompt(s)}>Prompt Gambar</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {scenes.length > 0 && scenes.length < totalRequested && !loading ? (
-                <div className="text-center">
-                  <Button onClick={handleLoadMore} variant="secondary" className="rounded-2xl">
-                    <Plus className="mr-2 h-4 w-4" /> Tampilkan Scene {scenes.length + 1}-{Math.min(scenes.length + 3, totalRequested)}
-                  </Button>
-                </div>
-              ) : null}
-              <Separator />
-              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center pt-4">
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                  disabled={loading}
-                  onClick={() => toast({ title: 'Belum tersedia', description: 'Fitur Simpan Prompt belum diimplementasikan.' })}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  <span className="">Simpan Prompt</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl"
-                  onClick={handleReset}
-                  disabled={loading}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  <span className="">Reset Form</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl"
-                  disabled={loading}
-                  onClick={() => toast({ title: 'Belum tersedia', description: 'Riwayat Prompt belum diimplementasikan.' })}
-                >
-                  <History className="mr-2 h-4 w-4" />
-                  <span className="">Riwayat Prompt</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-          <DialogContent className="rounded-2xl sm:max-w-xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Detail Prompt</DialogTitle>
-            </DialogHeader>
-            {detailScene ? (
-              <div className="space-y-4">
-                <DetailBox title="Prompt Detail (Indonesia)" data={detailScene.prompt_detail_id} map={keyMapId} />
-                <DetailBox title="Prompt Detail (English)" data={detailScene.prompt_detail_en} map={keyMapEn} />
-              </div>
-            ) : null}
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={imageOpen} onOpenChange={setImageOpen}>
-          <DialogContent className="rounded-2xl sm:max-w-xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Prompt Gambar</DialogTitle>
-            </DialogHeader>
-            <Textarea readOnly value={imagePrompt} className="h-40 bg-muted" />
-            <div className="text-right">
-              <Button className="rounded-2xl" onClick={() => { navigator.clipboard.writeText(imagePrompt); toast({ title: 'Disalin', description: 'Prompt gambar berhasil disalin.' }) }}>Salin</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </section>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border bg-emerald-50 p-3 text-center">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-xl font-semibold text-emerald-700">{value}</div>
-    </div>
-  )
-}
-
-function DetailBox({ title, data, map }: { title: string; data?: Record<string, string>; map: Record<string, string> }) {
-  const all = data || {}
-  const text = Object.values(all).join(', ')
-  return (
-    <div className="rounded-xl border p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">{title}</div>
-        <Button size="sm" className="rounded-xl" onClick={() => navigator.clipboard.writeText(text).then(() => toast({ title: 'Disalin', description: 'Prompt berhasil disalin.' }))}>Salin</Button>
-      </div>
-      <div className="space-y-2">
-        {Object.keys(map).map((k) => (
-          <p key={k} className="text-sm">
-            <strong className="block font-medium">{map[k]}:</strong> <span className="text-muted-foreground">{all[k] || '-'}</span>
-          </p>
-        ))}
-      </div>
-    </div>
-  )
-}

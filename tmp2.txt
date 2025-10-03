@@ -1,0 +1,114 @@
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Stat label="Scene" value={scenes.length ? String(scenes.length) : '-'} />
+                <Stat label="Estimasi" value={scenes.length ? `${scenes.length * 8} dtk` : '-'} />
+                <Stat label="Mapel" value={subject || '-'} />
+                <Stat label="Jenjang" value={grade || '-'} />
+              </div>
+              <Separator />
+              {!loading && scenes.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground">
+                  <div className="mb-2 inline-flex rounded-2xl bg-primary/10 px-3 py-1 text-sm text-primary">Siap memulai</div>
+                  <div>Atur parameter di panel kiri, lalu klik Buat Prompt.</div>
+                </div>
+              ) : null}
+              {loading ? (
+                <div className="py-16 text-center">
+                  <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+                  <div className="mt-4 text-muted-foreground">AI sedang menyusun materi...</div>
+                </div>
+              ) : null}
+              {scenes.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2 ">
+                  {scenes.map((s) => (
+                    <div key={s.scene} className="rounded-2xl border bg-card p-4 shadow-sm bg-gradient-to-b from-purple-600/15 via-blue-600/10 to-background">
+                      <div className="mb-2 text-primary"><Film className="inline h-5 w-5" /></div>
+                      <h3 className="text-lg font-semibold">Scene {s.scene}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">Durasi 8 Detik</p>
+                      <div className="mt-4 flex gap-2">
+                        <Button variant="default" className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={() => { setDetailScene(s); setDetailOpen(true) }}>Lihat Prompt</Button>
+                        <Button variant="outline" className="flex-1 rounded-xl" onClick={() => openImagePrompt(s)}>Prompt Gambar</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {scenes.length > 0 && scenes.length < totalRequested && !loading ? (
+                <div className="text-center">
+                  <Button onClick={handleLoadMore} variant="secondary" className="rounded-2xl">
+                    <Plus className="mr-2 h-4 w-4" /> Tampilkan Scene {scenes.length + 1}-{Math.min(scenes.length + 3, totalRequested)}
+                  </Button>
+                </div>
+              ) : null}
+              <Separator />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={() => toast({ title: 'Belum tersedia', description: 'Fitur Simpan Prompt belum diimplementasikan.' })}>
+                  <Download className="mr-2 h-4 w-4" /> Simpan Prompt
+                </Button>
+                <Button variant="secondary" className="rounded-2xl" onClick={() => toast({ title: 'Belum tersedia', description: 'Riwayat Prompt belum diimplementasikan.' })}>
+                  <History className="mr-2 h-4 w-4" /> Riwayat Prompt
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Detail Prompt</DialogTitle>
+            </DialogHeader>
+            {detailScene ? (
+              <div className="space-y-4">
+                <DetailBox title="🇮🇩 Prompt Detail (Indonesia)" data={detailScene.prompt_detail_id} map={keyMapId} />
+                <DetailBox title="🇬🇧 Prompt Detail (English)" data={detailScene.prompt_detail_en} map={keyMapEn} />
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Prompt Gambar</DialogTitle>
+            </DialogHeader>
+            <Textarea readOnly value={imagePrompt} className="h-40 bg-muted" />
+            <div className="text-right">
+              <Button className="rounded-2xl" onClick={() => { navigator.clipboard.writeText(imagePrompt); toast({ title: 'Disalin', description: 'Prompt gambar berhasil disalin.' }) }}>Salin</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </section>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-emerald-50 p-3 text-center">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-xl font-semibold text-emerald-700">{value}</div>
+    </div>
+  )
+}
+
+function DetailBox({ title, data, map }: { title: string; data?: Record<string, string>; map: Record<string, string> }) {
+  const all = data || {}
+  const text = Object.values(all).join(', ')
+  return (
+    <div className="rounded-xl border p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold">{title}</div>
+        <Button size="sm" className="rounded-xl" onClick={() => navigator.clipboard.writeText(text).then(() => toast({ title: 'Disalin', description: 'Prompt berhasil disalin.' }))}>Salin</Button>
+      </div>
+      <div className="space-y-2">
+        {Object.keys(map).map((k) => (
+          <p key={k} className="text-sm">
+            <strong className="block font-medium">{map[k]}:</strong> <span className="text-muted-foreground">{all[k] || '-'}</span>
+          </p>
+        ))}
+      </div>
+    </div>
+  )
+}
+

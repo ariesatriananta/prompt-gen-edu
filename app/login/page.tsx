@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { toast } from '@/components/ui/use-toast'
+import { toast } from '@/hooks/use-toast'
 import { createClient } from '@/lib/supabase/client'
 
 const LoginSchema = z.object({
@@ -132,4 +132,3 @@ export default function LoginPage() {
     </main>
   )
 }
-

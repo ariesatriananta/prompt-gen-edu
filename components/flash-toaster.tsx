@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { toast } from '@/components/ui/use-toast'
+import { toast } from '@/hooks/use-toast'
 
 export function FlashToaster() {
   const search = useSearchParams()
@@ -21,4 +21,3 @@ export function FlashToaster() {
 
   return null
 }
-
