@@ -87,7 +87,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
       <div className="flex h-14 w-full items-center justify-between px-2 md:px-4">
         {/* Left: Sidebar toggles + Logo */}
         <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-3 select-none">
+            <Link href="/" aria-label="Beranda" className="flex items-center gap-3 select-none">
                 <div className="flex aspect-square size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 text-white">
                 <Wand2 className="size-5" />
                 </div>
@@ -102,6 +102,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
                 className="md:hidden"
                 onClick={() => document.dispatchEvent(new CustomEvent("app:toggleMobileMenu"))}
                 aria-label="Toggle mobile menu"
+                type="button"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -112,6 +113,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
                 onClick={toggleSidebar}
                 aria-label="Toggle sidebar"
                 aria-pressed={sidebarOpen}
+                type="button"
               >
                 <PanelLeft className={"h-5 w-5 transition-transform " + (sidebarOpen ? "rotate-0" : "-rotate-90 opacity-60")} />
               </Button>
@@ -134,7 +136,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="rounded-2xl">
+                  <Button variant="ghost" className="rounded-2xl" aria-label="Menu akun" type="button">
                     <div className="flex items-center gap-2">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
                         <User className="h-4 w-4" />

@@ -9,6 +9,7 @@ export default function PageOverlay() {
   const lastPath = useRef<string | null>(null)
   const awaitingNav = useRef(false)
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   // Show immediately when user clicks internal links
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function PageOverlay() {
         // Jika menuju ke route yang sama (tanpa perubahan pathname/search), jangan tampilkan overlay
         if (url.pathname === window.location.pathname && url.search === window.location.search) return
       } catch {}
+      if (prefersReducedMotion) return
       awaitingNav.current = true
       lastPath.current = pathname
       setVisible(true)

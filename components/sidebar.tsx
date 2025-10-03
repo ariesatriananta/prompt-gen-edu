@@ -124,12 +124,15 @@ export function Sidebar() {
                     onClick={() => {
                       if (item.title === 'Home') {
                         window.location.href = '/'
+                        setMobileMenuOpen(false)
                       } else if (item.title === 'User Management') {
                         window.location.href = '/admin/users'
+                        setMobileMenuOpen(false)
                       } else if (item.items) {
                         toggleExpanded(item.title)
                       }
                     }}
+                    aria-current={isItemActive(item) ? 'page' : undefined}
                   >
                     <div className="flex items-center gap-3">
                       {item.icon}
@@ -155,6 +158,8 @@ export function Sidebar() {
                               ? "bg-primary/10 text-primary font-medium"
                               : undefined,
                           )}
+                          aria-current={subItem.url && pathname.startsWith(subItem.url) ? 'page' : undefined}
+                          onClick={() => setMobileMenuOpen(false)}
                         >
                           {subItem.title}
                           {subItem.badge && (
@@ -206,6 +211,7 @@ export function Sidebar() {
                         toggleExpanded(item.title)
                       }
                     }}
+                    aria-current={isItemActive(item) ? 'page' : undefined}
                   >
                     <div className="flex items-center gap-3">
                       {item.icon}
@@ -235,6 +241,7 @@ export function Sidebar() {
                               ? "bg-primary/10 text-primary font-medium"
                               : undefined,
                           )}
+                          aria-current={subItem.url && pathname.startsWith(subItem.url) ? 'page' : undefined}
                         >
                           {subItem.title}
                           {subItem.badge && (

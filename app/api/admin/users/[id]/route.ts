@@ -13,7 +13,7 @@ async function assertAdmin() {
   return { user, supabase }
 }
 
-export async function PATCH(_: Request, { params }: { params: { id: string } }) {
+export async function PATCH(_: Request, { params }: any) {
   try {
     const ctx = await assertAdmin()
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -50,7 +50,7 @@ export async function PATCH(_: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: any) {
   try {
     const ctx = await assertAdmin()
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -62,4 +62,3 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
   }
 }
-

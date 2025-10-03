@@ -12,6 +12,9 @@ export function ContentWrapper({ children, enabled }: { children: React.ReactNod
     return () => document.removeEventListener('app:toggleSidebar', onToggleSidebar as EventListener)
   }, [])
 
-  return <div className={cn('pt-14', enabled && open ? 'md:pl-64' : '')}>{children}</div>
+  return (
+    <div id="main" tabIndex={-1} className={cn('pt-14', enabled && open ? 'md:pl-64' : '')}>
+      {children}
+    </div>
+  )
 }
-

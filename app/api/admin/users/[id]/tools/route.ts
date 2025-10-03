@@ -12,14 +12,14 @@ async function assertAdmin() {
   return supabase
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: any) {
   const supabase = await assertAdmin()
   if (!supabase) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { data } = await supabase.from('member_tools').select('tool_id').eq('profile_id', params.id)
   return NextResponse.json({ toolIds: (data || []).map((d: any) => d.tool_id) })
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: any) {
   try {
     const supabase = await assertAdmin()
     if (!supabase) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -37,4 +37,3 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
   }
 }
-
