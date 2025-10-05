@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -52,7 +52,23 @@ function extractJSON(text?: string): any | null {
   }
 }
 
+function formatDurationID(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '-'
+  const s = Math.floor(totalSeconds)
+  const hours = Math.floor(s / 3600)
+  const minutes = Math.floor((s % 3600) / 60)
+  const seconds = s % 60
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours} jam`)
+  if (minutes > 0) parts.push(`${minutes} menit`)
+  if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`)
+  // Jika ada jam, biasanya detik tidak krusial → tampilkan jam & menit saja
+  if (parts.length === 0) return '0 detik'
+  return parts.join(', ')
+}
+
 export default function MotionpromptPage() {
+  const [accessChecked, setAccessChecked] = useState(false)
   const [subject, setSubject] = useState('IPA')
   const [grade, setGrade] = useState('PAUD/TK')
   const [style, setStyle] = useState<'3D Animation' | '2D Animation'>('3D Animation')
@@ -71,6 +87,25 @@ export default function MotionpromptPage() {
   const [detailScene, setDetailScene] = useState<SceneDetail | null>(null)
   const [imageOpen, setImageOpen] = useState(false)
   const [imagePrompt, setImagePrompt] = useState('')
+
+  // Guard access for tool key 'motionprompt'
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/tools/access?key=motionprompt', { cache: 'no-store' })
+        const json = await res.json()
+        if (!json?.allowed) {
+          toast({ variant: 'destructive', title: 'Akses ditolak', description: 'Anda tidak memiliki akses ke tool ini.' })
+          window.location.href = '/?flash=denied'
+          return
+        }
+        setAccessChecked(true)
+      } catch {
+        toast({ variant: 'destructive', title: 'Gagal memeriksa akses', description: 'Coba lagi nanti.' })
+        window.location.href = '/?flash=denied'
+      }
+    })()
+  }, [])
 
   const callApi = async (prompt: string) => {
     const res = await fetch('/api/motion/generate', {
@@ -170,6 +205,85 @@ OUTPUT_FORMAT: Strict JSON only.
     setImageOpen(true)
   }
 
+  const formatSceneForTxtLocale = (
+    s: SceneDetail,
+    map: Record<string, string>,
+    data?: Record<string, string>,
+  ) => {
+    const lines: string[] = []
+    lines.push('-----------------')
+    lines.push(` Scene ${s.scene}`)
+    lines.push('-----------------')
+    const d = data || {}
+    Object.keys(map).forEach((k) => {
+      const label = map[k]
+      const val = (d as any)[k] || '-'
+      lines.push(`${label}:`)
+      lines.push(String(val))
+      lines.push('')
+    })
+    return lines.join('\n')
+  }
+
+  const handleSavePrompts = () => {
+    if (!scenes.length) {
+      toast({ variant: 'destructive', title: 'Tidak ada data', description: 'Buat prompt terlebih dahulu.' })
+      return
+    }
+    const sorted = [...scenes].sort((a, b) => a.scene - b.scene)
+    const headerId = [
+      '=== Motion Prompt (Indonesia) ===',
+      `Mata Pelajaran: ${subject || '-'}`,
+      `Jenjang: ${grade || '-'}`,
+      `Gaya: ${style}`,
+      `Materi: ${topic || '-'}`,
+      `Tujuan Pembelajaran: ${learningObjective || '-'}`,
+      `Jumlah Adegan: ${scenes.length}`,
+      `Estimasi Durasi: ${formatDurationID(scenes.length * 8)}`,
+      '====================\n\n',
+      '',
+    ].join('\n')
+    const headerEn = [
+      '=== Motion Prompt (English) ===',
+      `Subject: ${subject || '-'}`,
+      `Grade: ${grade || '-'}`,
+      `Style: ${style}`,
+      `Topic: ${topic || '-'}`,
+      `Learning Objective: ${learningObjective || '-'}`,
+      `Total Scenes: ${scenes.length}`,
+      `Estimated Duration: ${formatDurationID(scenes.length * 8)}`,
+      '====================\n\n',
+      '',
+    ].join('\n')
+    const bodyId = sorted
+      .map((s) => formatSceneForTxtLocale(s, keyMapId, s.prompt_detail_id))
+      .join('\n\n')
+    const bodyEn = sorted
+      .map((s) => formatSceneForTxtLocale(s, keyMapEn, s.prompt_detail_en))
+      .join('\n\n')
+    const contentId = headerId + bodyId
+    const contentEn = headerEn + bodyEn
+    const ts = new Date()
+      .toISOString()
+      .replace(/[:T]/g, '-')
+      .slice(0, 19)
+    const safeTopic = (topic || 'prompt').toLowerCase().replace(/[^a-z0-9-_]+/g, '-')
+    const download = (name: string, content: string) => {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }
+    download(`motionprompt-${safeTopic}-${scenes.length}scene-${ts}-id.txt`, contentId)
+    download(`motionprompt-${safeTopic}-${scenes.length}scene-${ts}-en.txt`, contentEn)
+    toast({ title: 'Prompt disimpan', description: `Berhasil mengunduh 2 file untuk ${scenes.length} scene.` })
+  }
+
   const handleReset = () => {
     setSubject('IPA')
     setGrade('PAUD/TK')
@@ -189,15 +303,16 @@ OUTPUT_FORMAT: Strict JSON only.
   }
 
 
+  if (!accessChecked) return null
   return (
     <section className="relative">
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-purple-600/15 via-blue-600/10 to-background" />
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="mb-6 text-center">
           <div className="inline-block rounded-2xl bg-card p-4 shadow">
-            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">Veo 3 Prompt Generator</h1>
+            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">MotionPrompt</h1>
           </div>
-          <p className="mt-3 text-muted-foreground">Buat naskah scene edukasi untuk anak.</p>
+          <p className="mt-3 text-muted-foreground">Buat prompt untuk video/animasi pembelajaran secara mudah dan cepat</p>
         </div>
         {/* Alert inline dihapus; error akan muncul via toast/snackbar */}
 
@@ -271,7 +386,7 @@ OUTPUT_FORMAT: Strict JSON only.
                   size="lg"
                   onClick={handleRandomIdea}
                   variant="secondary"
-                  className="w-full rounded-2xl"
+                  className="w-full rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300"
                   disabled={loading}
                 >
                   <Plus className="mr-2 h-5 w-5" />
@@ -288,7 +403,7 @@ OUTPUT_FORMAT: Strict JSON only.
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <Stat label="Scene" value={scenes.length ? String(scenes.length) : '-'} />
-                <Stat label="Estimasi" value={scenes.length ? `${scenes.length * 8} dtk` : '-'} />
+                <Stat label="Estimasi" value={scenes.length ? formatDurationID(scenes.length * 8) : '-'} />
                 <Stat label="Mapel" value={subject || '-'} />
                 <Stat label="Jenjang" value={grade || '-'} />
               </div>
@@ -321,8 +436,9 @@ OUTPUT_FORMAT: Strict JSON only.
                 </div>
               ) : null}
               {scenes.length > 0 && scenes.length < totalRequested && !loading ? (
-                <div className="text-center">
-                  <Button onClick={handleLoadMore} variant="secondary" className="rounded-2xl">
+                <div className="text-center py-4 pt-8">
+                  <Button onClick={handleLoadMore} variant="secondary" className="rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300
+">
                     <Plus className="mr-2 h-4 w-4" /> Tampilkan Scene {scenes.length + 1}-{Math.min(scenes.length + 3, totalRequested)}
                   </Button>
                 </div>
@@ -332,16 +448,16 @@ OUTPUT_FORMAT: Strict JSON only.
                 <Button
                   type="button"
                   className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                  disabled={loading}
-                  onClick={() => toast({ title: 'Belum tersedia', description: 'Fitur Simpan Prompt belum diimplementasikan.' })}
+                  disabled={loading || scenes.length === 0}
+                  onClick={handleSavePrompts}
                 >
                   <Download className="mr-2 h-4 w-4" />
                   <span className="">Simpan Prompt</span>
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl"
+                  variant="secondary"
+                  className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300"
                   onClick={handleReset}
                   disabled={loading}
                 >
@@ -351,7 +467,7 @@ OUTPUT_FORMAT: Strict JSON only.
                 <Button
                   type="button"
                   variant="secondary"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl"
+                  className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300"
                   disabled={loading}
                   onClick={() => toast({ title: 'Belum tersedia', description: 'Riwayat Prompt belum diimplementasikan.' })}
                 >
@@ -404,17 +520,29 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function DetailBox({ title, data, map }: { title: string; data?: Record<string, string>; map: Record<string, string> }) {
   const all = data || {}
-  const text = Object.values(all).join(', ')
+  const lines = Object.keys(map).map((k) => `${map[k]}: \n${all[k] || '-'}`)
+  const text = `${lines.join('\n\n')}`
   return (
     <div className="rounded-xl border p-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold">{title}</div>
-        <Button size="sm" className="rounded-xl" onClick={() => navigator.clipboard.writeText(text).then(() => toast({ title: 'Disalin', description: 'Prompt berhasil disalin.' }))}>Salin</Button>
+        <Button
+          size="sm"
+          className="rounded-xl"
+          onClick={() =>
+            navigator.clipboard
+              .writeText(text)
+              .then(() => toast({ title: 'Disalin', description: 'Prompt berhasil disalin.' }))
+          }
+        >
+          Salin
+        </Button>
       </div>
       <div className="space-y-2">
         {Object.keys(map).map((k) => (
           <p key={k} className="text-sm">
-            <strong className="block font-medium">{map[k]}:</strong> <span className="text-muted-foreground">{all[k] || '-'}</span>
+            <strong className="block font-medium">{map[k]}:</strong>{' '}
+            <span className="text-muted-foreground">{all[k] || '-'}</span>
           </p>
         ))}
       </div>

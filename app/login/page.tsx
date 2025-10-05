@@ -34,8 +34,24 @@ export default function LoginPage() {
   const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
     try {
       const supabase = createClient()
-      const { error } = await supabase.auth.signInWithPassword({ email: values.email, password: values.password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email: values.email, password: values.password })
       if (error) throw error
+      const uid = data.user?.id
+      if (uid) {
+        const { data: prof } = await supabase.from('profiles').select('disabled, trial_ends_at').eq('id', uid).maybeSingle()
+        const now = new Date()
+        const trialExpired = !!prof?.trial_ends_at && new Date(prof.trial_ends_at) < now
+        if (prof?.disabled) {
+          await supabase.auth.signOut()
+          toast({ variant: 'destructive', title: 'Akun dinonaktifkan', description: 'User anda dinon-aktifkan. Hubungi admin.' })
+          return
+        }
+        if (trialExpired) {
+          await supabase.auth.signOut()
+          toast({ variant: 'destructive', title: 'Trial berakhir', description: 'Masa trial akun anda telah berakhir.' })
+          return
+        }
+      }
       toast({ title: 'Masuk berhasil', description: `Selamat datang, ${values.email}` })
       window.location.href = '/'
     } catch (err: any) {

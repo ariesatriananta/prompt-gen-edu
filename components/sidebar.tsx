@@ -35,7 +35,7 @@ const sidebarItems: SidebarGroup[] = [
   { title: "User Management", icon: <Settings /> },
 ]
 
-export function Sidebar() {
+export function Sidebar({ allowedKeys = [], role }: { allowedKeys?: string[]; role?: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
@@ -70,6 +70,21 @@ export function Sidebar() {
       setExpandedItems((prev) => ({ ...prev, ['Tools']: true }))
     }
   }, [pathname])
+
+  // Filter sidebar items based on allowed tool keys for members
+  const isAdmin = (role || '').toLowerCase() === 'admin'
+  const filteredItems: SidebarGroup[] = sidebarItems
+    .map((g) => {
+      if (g.title === 'User Management' && !isAdmin) return null
+      if (g.title !== 'Tools') return g
+      if (isAdmin) return g
+      const items = (g.items || []).filter((it) => {
+        const slug = (it.url || '').split('/').pop() || ''
+        return allowedKeys.includes(slug)
+      })
+      return { ...g, items }
+    })
+    .filter(Boolean) as SidebarGroup[]
 
   return (
     <>
@@ -110,7 +125,7 @@ export function Sidebar() {
 
           <ScrollArea className="flex-1 px-3 py-2">
             <div className="space-y-1">
-              {sidebarItems.map((item) => (
+              {filteredItems.map((item) => (
                 <div key={item.title} className="mb-1">
                   <button
                     className={cn(
@@ -191,7 +206,7 @@ export function Sidebar() {
 
           <ScrollArea className="flex-1 px-3 py-2 pt-16">
             <div className="space-y-1">
-              {sidebarItems.map((item) => (
+              {filteredItems.map((item) => (
                 <div key={item.title} className="mb-1">
                   <button
                     className={cn(

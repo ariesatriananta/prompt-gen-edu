@@ -22,7 +22,7 @@ export default async function AdminUsersPage() {
 
   const { data: profilesRaw } = await supabase
     .from('profiles')
-    .select('id, email, full_name, role, trial_ends_at, created_at')
+    .select('id, email, full_name, role, trial_ends_at, created_at, disabled')
     .order('created_at', { ascending: false })
 
   const profiles = profilesRaw ?? []

@@ -54,3 +54,19 @@ export async function POST(req: Request) {
   }
 }
 
+export async function GET() {
+  try {
+    const adminUser = await assertAdmin()
+    if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const supabase = await createServerSupabase()
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, role, trial_ends_at, created_at, disabled')
+      .order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ profiles: data ?? [] })
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
+  }
+}

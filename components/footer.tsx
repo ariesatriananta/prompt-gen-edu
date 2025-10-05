@@ -16,8 +16,7 @@ export function Footer() {
                 <span className="text-xl font-semibold tracking-tight">ClassToon</span>
               </div>
               <p className="mt-3 max-w-md text-white/80">
-                Platform AI & Digital Tools untuk edukasi. Hasil cepat, konsisten, dan mudah disesuaikan untuk guru,
-                siswa, dan profesional.
+                Platform AI & Digital Tools untuk Animasi. Menyediakan hasil yang cepat, konsisten, dan mudah.
               </p>
             </div>
 
