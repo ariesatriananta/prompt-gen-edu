@@ -25,39 +25,20 @@ Scope: berlaku untuk seluruh repo kecuali ada AGENTS.md yang lebih dalam (overri
 - Sidebar harus mem-filter item Tools sesuai akses (sudah dilakukan di `components/sidebar.tsx` via props `allowedKeys`, `role`).
 - Tool key ↔ path slug: key harus sama dengan slug terakhir URL (mis. `/tools/motionprompt` → key `motionprompt`). Jika beda, tambahkan mapping eksplisit.
 
-### Guard Akses Halaman Tool (Client)
-Setiap halaman tool WAJIB memasang guard akses agar direct URL tetap aman. Pola minimal:
+### Guard Akses Halaman Tool (Server)
+Gunakan layout server per tool dan util `enforceToolAccess(toolKey)` agar akses diverifikasi sebelum render (tanpa flicker):
 
 ```tsx
-"use client"
-import { useEffect, useState } from 'react'
-import { toast } from '@/hooks/use-toast'
+// app/tools/<tool>/layout.tsx
+import { enforceToolAccess } from '@/lib/auth/tools-guard'
 
-export default function Page() {
-  const [ok, setOk] = useState(false)
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/tools/access?key=<toolKey>', { cache: 'no-store' })
-        const json = await res.json()
-        if (!json?.allowed) {
-          toast({ variant: 'destructive', title: 'Akses ditolak', description: 'Anda tidak memiliki akses ke tool ini.' })
-          window.location.href = '/?flash=denied'
-          return
-        }
-        setOk(true)
-      } catch {
-        toast({ variant: 'destructive', title: 'Gagal memeriksa akses', description: 'Coba lagi nanti.' })
-        window.location.href = '/?flash=denied'
-      }
-    })()
-  }, [])
-  if (!ok) return null
-  return (<main>...</main>)
+export default async function ToolLayout({ children }: { children: React.ReactNode }) {
+  await enforceToolAccess('<toolKey>')
+  return <>{children}</>
 }
 ```
 
-API pendukung: `GET /api/tools/access?key=<toolKey>`.
+Parent `app/tools/layout.tsx` hanya memastikan user sudah login. Status `disabled/trial` dicek global di `app/layout.tsx`.
 
 ## Pola Error & Notifikasi
 - Gunakan toast destruktif untuk error (`variant: 'destructive'`).
@@ -88,4 +69,3 @@ Wajib tersedia di dev/prod:
 - Jangan menambahkan dependency baru tanpa kebutuhan kuat.
 - Patch fokus pada task. Hindari refactor besar di luar lingkup.
 - Bila menambah API, letakkan di `app/api/.../route.ts` dan selalu validasi input.
-

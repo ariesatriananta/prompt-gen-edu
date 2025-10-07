@@ -30,6 +30,7 @@ export default function UsersManager({
   const [profiles, setProfiles] = useState<Profile[]>(initialProfiles)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [toolCounts, setToolCounts] = useState<Record<string, number>>({})
 
   const refetchProfiles = async () => {
     try {
@@ -38,12 +39,30 @@ export default function UsersManager({
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Gagal memuat daftar pengguna')
       setProfiles((json?.profiles || []).filter(Boolean))
+      // Ambil counts tools sekaligus
+      try {
+        const r2 = await fetch('/api/admin/users/tools-counts')
+        const j2 = await r2.json()
+        if (r2.ok) setToolCounts(j2.counts || {})
+      } catch {}
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Gagal memuat', description: e?.message || 'Tidak dapat memuat pengguna.' })
     } finally {
       setRefreshing(false)
     }
   }
+
+  // initial counts fetch (first mount)
+  // Note: profiles sudah diberikan dari SSR; kita muat counts tanpa blocking UI
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const r2 = await fetch('/api/admin/users/tools-counts')
+        const j2 = await r2.json()
+        if (r2.ok) setToolCounts(j2.counts || {})
+      } catch {}
+    })()
+  }, [])
 
   const updateProfile = async (id: string, patch: Partial<Profile> & { password?: string }) => {
     try {
@@ -145,7 +164,12 @@ export default function UsersManager({
                 />
               </td>
               <td className="p-3 align-middle text-center">
-                <ToolsDialog tools={tools} profileId={p.id} />
+                <ToolsDialog
+                  tools={tools}
+                  profileId={p.id}
+                  initialCount={toolCounts[p.id] ?? 0}
+                  onCountChange={(n) => setToolCounts((m) => ({ ...m, [p.id]: n }))}
+                />
               </td>
               <td className="p-3 align-middle">
                 <label className="inline-flex items-center gap-2">
@@ -171,11 +195,11 @@ export default function UsersManager({
   )
 }
 
-function ToolsDialog({ tools, profileId }: { tools: Tool[]; profileId: string }) {
+function ToolsDialog({ tools, profileId, initialCount = 0, onCountChange }: { tools: Tool[]; profileId: string; initialCount?: number; onCountChange?: (n: number) => void }) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [count, setCount] = useState<number | null>(null)
+  const [count, setCount] = useState<number>(initialCount)
 
   const load = async () => {
     try {
@@ -190,11 +214,8 @@ function ToolsDialog({ tools, profileId }: { tools: Tool[]; profileId: string })
     }
   }
 
-  // Preload count on mount for label
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Saat membuka dialog, muat daftar tools user
+  // Tidak melakukan preload untuk menghindari banyak request
 
   const toggle = (toolId: string) => {
     setSelected((prev) => (prev.includes(toolId) ? prev.filter((i) => i !== toolId) : [...prev, toolId]))
@@ -230,7 +251,7 @@ function ToolsDialog({ tools, profileId }: { tools: Tool[]; profileId: string })
             count === 0 ? 'bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-100' : undefined,
           )}
         >
-          {typeof count === 'number' ? `${count} Tools` : '…'}
+          {`${count} Tools`}
         </Button>
       </DialogTrigger>
       <DialogContent className="rounded-2xl sm:max-w-md">
@@ -252,7 +273,7 @@ function ToolsDialog({ tools, profileId }: { tools: Tool[]; profileId: string })
         </div>
         <div className="flex justify-end gap-2 pt-3">
           <Button variant="outline" className="rounded-xl" onClick={() => setOpen(false)}>Batal</Button>
-          <Button disabled={loading} className="rounded-xl" onClick={async () => { await save(); setCount(selected.length) }}>
+          <Button disabled={loading} className="rounded-xl" onClick={async () => { await save(); setCount(selected.length); onCountChange?.(selected.length) }}>
             {loading ? 'Menyimpan…' : 'Simpan'}
           </Button>
         </div>

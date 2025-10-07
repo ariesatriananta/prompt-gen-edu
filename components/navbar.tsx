@@ -45,14 +45,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
         setProfile(null)
       }
     })
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        await fetch('/api/auth/callback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event, session }),
-        })
-      } catch (e) {}
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         const { data: p } = await supabase
