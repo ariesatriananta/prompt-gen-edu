@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -62,7 +62,7 @@ function formatDurationID(totalSeconds: number): string {
   if (hours > 0) parts.push(`${hours} jam`)
   if (minutes > 0) parts.push(`${minutes} menit`)
   if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`)
-  // Jika ada jam, biasanya detik tidak krusial → tampilkan jam & menit saja
+  // Jika ada jam, biasanya detik tidak krusial ? tampilkan jam & menit saja
   if (parts.length === 0) return '0 detik'
   return parts.join(', ')
 }
@@ -529,3 +529,4 @@ function DetailBox({ title, data, map }: { title: string; data?: Record<string, 
     </div>
   )
 }
+

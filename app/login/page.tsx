@@ -1,6 +1,5 @@
 "use client"
 import Link from 'next/link'
-import { useEffect } from 'react'
 import { Wand2, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -18,12 +17,6 @@ const LoginSchema = z.object({
 })
 
 export default function LoginPage() {
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) window.location.replace('/')
-    })
-  }, [])
 
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
@@ -53,7 +46,7 @@ export default function LoginPage() {
         }
       }
       toast({ title: 'Masuk berhasil', description: `Selamat datang, ${values.email}` })
-      window.location.href = '/'
+      window.location.replace('/')
     } catch (err: any) {
       const rawMsg = String(err?.message ?? '')
       const msg = rawMsg.toLowerCase().includes('invalid') ? 'Email atau kata sandi salah.' : rawMsg || 'Terjadi kesalahan pada server.'

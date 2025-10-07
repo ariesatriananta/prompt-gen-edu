@@ -74,7 +74,7 @@ export default async function RootLayout({
         `}</style>
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <Navbar initialUser={user ? { id: user.id, email: user.email ?? undefined } : undefined} initialProfile={profile ?? undefined} />
           <FlashToaster />
           {/* Client-side short overlay for very fast transitions */}
