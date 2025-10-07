@@ -32,14 +32,14 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
   const pathname = usePathname()
 
   useEffect(() => {
+    // Pada halaman login, jangan inisialisasi Supabase client-side auth listener
+    if (pathname === '/login') {
+      setUser(null)
+      setProfile(null)
+      return
+    }
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
-      // Jika berada di halaman login, pastikan tidak menampilkan status login lama
-      if (pathname === '/login' && data.user) {
-        try { await supabase.auth.signOut() } catch {}
-        setUser(null); setProfile(null)
-        return
-      }
       setUser(data.user)
       if (data.user) {
         const { data: p } = await supabase
@@ -69,7 +69,7 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
     return () => {
       authListener.subscription.unsubscribe()
     }
-  }, [])
+  }, [pathname, router])
 
   const handleLogout = async () => {
     setLoggingOut(true)
