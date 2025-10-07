@@ -11,9 +11,17 @@ export function FlashToaster() {
   const clearedRef = useRef(false)
 
   useEffect(() => {
-    // Prevent multiple clears during hydration/navigation
     if (clearedRef.current) return
-    const flag = search.get('flash')
+    // Read from cookie first for robustness on prod redirects
+    let flag: string | null = null
+    try {
+      if (typeof document !== 'undefined') {
+        const m = document.cookie.match(/(?:^|; )flash=([^;]+)/)
+        if (m) flag = decodeURIComponent(m[1])
+      }
+    } catch {}
+    // Fallback to query param
+    if (!flag) flag = search.get('flash')
     if (!flag) return
     if (flag === 'denied') {
       toast({ variant: 'destructive', title: 'Akses ditolak', description: 'Anda tidak memiliki izin untuk mengakses halaman tersebut.' })
@@ -22,9 +30,12 @@ export function FlashToaster() {
     } else if (flag === 'trial_expired') {
       toast({ variant: 'destructive', title: 'Trial berakhir', description: 'Masa trial akun anda telah berakhir.' })
     }
-    // Bersihkan query agar tidak muncul saat refresh berikutnya (robust on prod)
+    // Bersihkan cookie + query agar tidak muncul saat refresh berikutnya
     clearedRef.current = true
     try {
+      if (typeof document !== 'undefined') {
+        document.cookie = 'flash=; Max-Age=0; path=/'
+      }
       // Defer replace to next tick to avoid race during mount
       setTimeout(() => {
         try {

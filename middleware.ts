@@ -27,8 +27,9 @@ export function middleware(req: NextRequest) {
   if (!hasSbCookie) {
     const url = req.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('flash', 'denied')
-    return NextResponse.redirect(url)
+    const res = NextResponse.redirect(url)
+    try { res.cookies.set('flash', 'denied', { path: '/' }) } catch {}
+    return res
   }
 
   return NextResponse.next()

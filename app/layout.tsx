@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { Navbar } from '@/components/navbar'
 import { FlashToaster } from '@/components/flash-toaster'
 import PageOverlay from '@/components/page-overlay'
@@ -44,7 +45,12 @@ export default async function RootLayout({
     if (profile?.disabled || trialExpired) {
       // Kill session and redirect with flash cause for client toast
       try { await supabase.auth.signOut() } catch {}
-      redirect(`/login?flash=${profile?.disabled ? 'disabled' : 'trial_expired'}`)
+      const flag = profile?.disabled ? 'disabled' : 'trial_expired'
+      try {
+        const c = await cookies()
+        c.set('flash', flag, { path: '/' })
+      } catch {}
+      redirect('/login')
     }
   }
 
