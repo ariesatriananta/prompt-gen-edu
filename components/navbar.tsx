@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { Wand2, Menu, PanelLeft, User, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -29,10 +29,17 @@ export function Navbar({ initialUser, initialProfile }: { initialUser?: InitialU
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
+      // Jika berada di halaman login, pastikan tidak menampilkan status login lama
+      if (pathname === '/login' && data.user) {
+        try { await supabase.auth.signOut() } catch {}
+        setUser(null); setProfile(null)
+        return
+      }
       setUser(data.user)
       if (data.user) {
         const { data: p } = await supabase

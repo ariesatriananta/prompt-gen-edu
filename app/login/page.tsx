@@ -1,5 +1,6 @@
 "use client"
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { Wand2, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,15 @@ const LoginSchema = z.object({
 })
 
 export default function LoginPage() {
+  // Pastikan tidak ada sesi client-side yang tersisa
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data?.session) {
+        try { await supabase.auth.signOut() } catch {}
+      }
+    })
+  }, [])
 
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
