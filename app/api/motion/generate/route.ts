@@ -9,19 +9,35 @@ export async function POST(req: Request) {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 20000) // 20s timeout
-    let res: Response
-    try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        cache: 'no-store',
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timeout)
+    const doRequest = async () => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 45000) // 45s timeout
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.4,
+              maxOutputTokens: 2048,
+              responseMimeType: 'application/json',
+            },
+          }),
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        return res
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
+    // Try once, and retry once on timeout/temporary failure
+    let res = await doRequest()
+    if (!res.ok && (res.status === 429 || res.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 800))
+      res = await doRequest()
     }
 
     if (!res.ok) {

@@ -107,6 +107,7 @@ export default function MotionpromptPage() {
     const context = scenes.length ? `CONTEXT: Previously generated scenes: ${JSON.stringify(scenes)}.` : ''
     return `
 TASK: Generate ${num} detailed animation prompt(s), starting from scene number ${start}. ${context}
+GRADE: ${grade} 
 INSTRUCTIONS: For each new scene, create a JSON object with a "scene" number and two nested objects: "prompt_detail_id" (for Indonesian) and "prompt_detail_en" (for English). Each nested object MUST contain these 7 keys: "visual_style", "core_scene_description", "cinematography", "lighting_and_color", "dialogue_and_audio", "educational_focus", "final_instructions".
 - "visual_style": Use this exact value: "${style}"
 - "core_scene_description": Describe the scene's action, setting, characters, and their expressions based on topic "${topic.trim()}" and story "${story.trim() || 'N/A'}".
@@ -115,6 +116,7 @@ INSTRUCTIONS: For each new scene, create a JSON object with a "scene" number and
 - "dialogue_and_audio": Dialogue MUST be in Indonesian for BOTH prompt_detail_id and prompt_detail_en objects.
 - "educational_focus": Use this exact value: "${learningObjective.trim()}"
 - "final_instructions": Base: "Ensure the scene is joyful and curiosity-inducing for elementary school students." Add negative: "${negative.trim()}".
+ADDITIONAL_RULES: Make sure language complexity, pacing, and concepts are appropriate for the grade level "${grade}".
 Ensure the 'scene' number is correctly incremented starting from ${start} and that the story is continuous.
 OUTPUT_FORMAT: Strict JSON only.
 {"scenes": [{"scene": ${start}, "prompt_detail_id": {...}, "prompt_detail_en": {...}}, ...]}`
@@ -309,7 +311,7 @@ OUTPUT_FORMAT: Strict JSON only.
               <div>
                 <label className="mb-2 block text-sm font-medium">2. Jenjang Kelas</label>
                 <div className="flex flex-wrap gap-2">
-                  {['PAUD/TK', 'Kelas 1-2', 'Kelas 3-4', 'Kelas 5-6'].map((g) => (
+                  {['PAUD/TK', 'Kelas 1-2', 'Kelas 3-4', 'Kelas 5-6', 'SMP', 'SMA'].map((g) => (
                     <Button key={g} type="button" variant={grade === g ? 'default' : 'outline'} className={cn('rounded-xl', grade === g ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : '')} onClick={() => setGrade(g)} disabled={loading}>
                       {g}
                     </Button>
