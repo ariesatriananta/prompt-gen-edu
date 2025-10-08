@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { Loader2, History, Wand2, Lightbulb, Dice5, Download } from 'lucide-react'
+import { Loader2, History, Wand2, Lightbulb, Dice5 } from 'lucide-react'
 import Link from 'next/link'
 
 type Scene = { beat: string; visual: string; aksi: string; dialog: string; audio: string; exit: string; transisi: string }
@@ -31,89 +31,14 @@ export default function StorypromptPage() {
   const [scriptOpen, setScriptOpen] = useState(false)
   const [scriptText, setScriptText] = useState('')
   const [sceneDialogOpen, setSceneDialogOpen] = useState(false)
-  const [sceneDialogText, setSceneDialogText] = useState('')
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
+  const [sceneDialogText, setSceneDialogText] = useState('')
 
   const callApi = async (path: string, payload: any) => {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const json = await res.json()
     if (!res.ok) throw new Error(json.error || 'API error')
     return json
-  }
-
-  const formatDurationID = (totalSeconds: number): string => {
-    if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '-'
-    const s = Math.floor(totalSeconds)
-    const hours = Math.floor(s / 3600)
-    const minutes = Math.floor((s % 3600) / 60)
-    const seconds = s % 60
-    const parts: string[] = []
-    if (hours > 0) parts.push(`${hours} jam`)
-    if (minutes > 0) parts.push(`${minutes} menit`)
-    if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`)
-    if (parts.length === 0) return '0 detik'
-    return parts.join(', ')
-  }
-
-  const handleSavePrompts = () => {
-    if (!Array.isArray(scenes) || scenes.length === 0) {
-      return toast({ variant: 'destructive', title: 'Tidak ada hasil', description: 'Buat prompt terlebih dahulu.' })
-    }
-    const header = [
-      '=== Story Prompt Export ===',
-      `Genre: ${genre}`,
-      `Kelompok Usia: ${ageGroup}`,
-      `Bahasa Dialog: ${language}`,
-      `Mode Prompt: ${promptLanguage}`,
-      `Jumlah Scene: ${scenes.length}`,
-      `Estimasi Durasi: ${formatDurationID(scenes.length * 8)}`,
-      `Tanggal: ${new Date().toLocaleString('id-ID')}`,
-      '===========================',
-      '',
-    ].join('\n')
-
-    const lines: string[] = []
-    scenes.forEach((s, i) => {
-      lines.push('-----------------')
-      lines.push(` Scene ${i + 1}`)
-      lines.push('-----------------')
-      lines.push(`A. BEAT/TUJUAN:\n${s.beat}`)
-      lines.push('')
-      lines.push(`B. DESKRIPSI VISUAL:\n${s.visual}`)
-      lines.push('')
-      lines.push(`C. AKSI UTAMA:\n${s.aksi}`)
-      lines.push('')
-      lines.push(`D. DIALOG:\n${s.dialog || '-'}`)
-      lines.push('')
-      lines.push(`E. AUDIO:\n${s.audio}`)
-      lines.push('')
-      lines.push(`F. EXIT STATE:\n${s.exit}`)
-      lines.push('')
-      lines.push(`G. TRANSISI:\n${s.transisi}`)
-      lines.push('')
-    })
-
-    const content = header + lines.join('\n')
-    try {
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const slug = (storyIdea || 'story')
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-_]+/g, '')
-        .slice(0, 60)
-      const name = `storyprompt-${slug}-${scenes.length}scene-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      toast({ title: 'Tersimpan', description: 'File TXT berhasil diunduh.' })
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Gagal menyimpan', description: e?.message || 'Coba lagi.' })
-    }
   }
 
   const handleRandomIdea = () => {
@@ -149,6 +74,7 @@ export default function StorypromptPage() {
       const { scenes: list } = await callApi('/api/story/generate', { genre, ageGroup, language, promptLanguage, storyIdea, characterDesc, moralLesson, numScenes })
       if (!Array.isArray(list) || !list.length) throw new Error('AI tidak mengembalikan hasil.')
       setScenes(list)
+      // log history
       try {
         await fetch('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool_key: 'storyprompt', subject: 'Story', grade: ageGroup, style: genre, topic: storyIdea, story: characterDesc, negative: '', scene_count: list.length, model: 'gemini-2.5-flash', response_json: { scenes: list } }) })
       } catch {}
@@ -210,6 +136,7 @@ export default function StorypromptPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-5">
+          {/* Kiri */}
           <Card className="lg:col-span-2">
             <CardHeader><CardTitle>Pengaturan Prompt</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -255,7 +182,7 @@ export default function StorypromptPage() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium">Pilihan Prompt</label>
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <Button type="button" variant={promptLanguage==='JSON'?'default':'outline'} className={cn('rounded-xl', promptLanguage==='JSON'?'bg-gradient-to-r from-purple-600 to-blue-600 text-white':'')} onClick={()=>setPromptLanguage('JSON')} disabled={loading}>Enhanced JSON Prompt (English)</Button>
                   <div className="grid grid-cols-2 gap-2">
                     <Button type="button" variant={promptLanguage==='EN'?'default':'outline'} className={cn('rounded-xl', promptLanguage==='EN'?'bg-gradient-to-r from-purple-600 to-blue-600 text-white':'')} onClick={()=>setPromptLanguage('EN')} disabled={loading}>EN Prompt</Button>
@@ -273,6 +200,7 @@ export default function StorypromptPage() {
             </CardContent>
           </Card>
 
+          {/* Kanan */}
           <Card className="lg:col-span-3">
             <CardHeader><CardTitle>Hasil Prompt Detail</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -293,28 +221,20 @@ export default function StorypromptPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {scenes.map((s,idx)=>(
                     <div key={idx} className="rounded-2xl border bg-card p-4 shadow-sm bg-gradient-to-b from-purple-600/15 via-blue-600/10 to-background">
+                      <div className="mb-2 text-primary">🎞️</div>
                       <h3 className="text-lg font-semibold">Scene {idx+1}</h3>
                       <p className="mt-1 text-xs text-muted-foreground">Durasi 8 Detik</p>
                       <div className="mt-4 flex gap-2">
-                        <Button variant="default" className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={()=>{ setSelectedScene(s); setSceneDialogText(buildSceneText(s)); setSceneDialogOpen(true) }}>Lihat Prompt</Button>
+                        <Button variant="default" className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={()=>{ setSceneDialogText(buildSceneText(s)); setSceneDialogOpen(true) }}>Lihat Prompt</Button>
+                        <Button variant="outline" className="flex-1 rounded-xl" onClick={()=>{ navigator.clipboard.writeText(buildSceneText(s)); toast({ title:'Disalin', description:'Prompt scene berhasil disalin.' }) }}>Copy</Button>
                       </div>
                     </div>
                   ))}
                 </div>
               ):null}
               <Separator />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white"
-                  onClick={handleSavePrompts}
-                  disabled={loading || scenes.length === 0}
-                >
-                  <Download className="mr-2 h-4 w-4" /> Simpan Prompt
-                </Button>
-                <Button onClick={handleScript} className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">Buat Naskah Lengkap dengan AI</Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button onClick={handleScript} className="rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">Buat Naskah Lengkap dengan AI</Button>
                 <Button asChild variant="secondary" className="rounded-2xl"><Link href="/history?tool=storyprompt"><History className="h-4 w-4 mr-2"/>Riwayat Prompt</Link></Button>
                 <Button variant="outline" className="rounded-2xl" onClick={handleAnalyze}>Analisis Kelayakan</Button>
               </div>
@@ -322,37 +242,30 @@ export default function StorypromptPage() {
           </Card>
         </div>
 
+        {/* Dialog Analisis */}
         <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
           <DialogContent className="rounded-2xl sm:max-w-xl">
             <DialogHeader><DialogTitle>Analisis Kelayakan</DialogTitle></DialogHeader>
             {analysis? (
               <pre className="bg-muted p-3 rounded-xl text-xs whitespace-pre-wrap">{JSON.stringify(analysis,null,2)}</pre>
             ): (
-              <div className="py-10 text-center text-muted-foreground">Memuat...</div>
+              <div className="py-10 text-center text-muted-foreground">Memuat…</div>
             )}
           </DialogContent>
         </Dialog>
 
+        {/* Dialog Scene Prompt */}
         <Dialog open={sceneDialogOpen} onOpenChange={setSceneDialogOpen}>
           <DialogContent className="rounded-2xl sm:max-w-xl">
             <DialogHeader><DialogTitle>Detail Prompt Scene</DialogTitle></DialogHeader>
-            {selectedScene ? (
-              <div className="space-y-2 text-sm">
-                <p><strong>A. BEAT/TUJUAN:</strong><br/> {selectedScene.beat}</p>
-                <p><strong>B. DESKRIPSI VISUAL:</strong><br/> {selectedScene.visual}</p>
-                <p><strong>C. AKSI UTAMA:</strong><br/> {selectedScene.aksi}</p>
-                <p><strong>D. DIALOG:</strong><br/> {selectedScene.dialog || '-'}</p>
-                <p><strong>E. AUDIO:</strong><br/> {selectedScene.audio}</p>
-                <p><strong>F. EXIT STATE:</strong><br/> {selectedScene.exit}</p>
-                <p><strong>G. TRANSISI:</strong><br/> {selectedScene.transisi}</p>
-              </div>
-            ) : null}
+            <Textarea readOnly value={sceneDialogText} className="h-48 bg-muted" />
             <div className="text-right">
               <Button className="rounded-xl" onClick={()=>{ navigator.clipboard.writeText(sceneDialogText); toast({ title:'Disalin', description:'Prompt scene berhasil disalin.' }) }}>Salin</Button>
             </div>
           </DialogContent>
         </Dialog>
 
+        {/* Dialog Naskah */}
         <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>
           <DialogContent className="rounded-2xl sm:max-w-xl">
             <DialogHeader><DialogTitle>Naskah Lengkap</DialogTitle></DialogHeader>
@@ -364,3 +277,5 @@ export default function StorypromptPage() {
     </section>
   )
 }
+
+
