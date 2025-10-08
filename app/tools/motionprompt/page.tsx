@@ -1,6 +1,6 @@
-﻿"use client"
+"use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { Loader2, Film, ImageIcon, Plus, Download, History, RotateCcw } from 'lucide-react'
+import Link from 'next/link'
 
 type SceneDetail = {
   scene: number
@@ -62,7 +63,7 @@ function formatDurationID(totalSeconds: number): string {
   if (hours > 0) parts.push(`${hours} jam`)
   if (minutes > 0) parts.push(`${minutes} menit`)
   if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`)
-  // Jika ada jam, biasanya detik tidak krusial → tampilkan jam & menit saja
+  // Jika ada jam, biasanya detik tidak krusial ? tampilkan jam & menit saja
   if (parts.length === 0) return '0 detik'
   return parts.join(', ')
 }
@@ -86,18 +87,166 @@ export default function MotionpromptPage() {
   const [detailScene, setDetailScene] = useState<SceneDetail | null>(null)
   const [imageOpen, setImageOpen] = useState(false)
   const [imagePrompt, setImagePrompt] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyItems, setHistoryItems] = useState<any[]>([])
+  const [historyDetailOpen, setHistoryDetailOpen] = useState(false)
+  const [historyDetail, setHistoryDetail] = useState<any | null>(null)
 
-
-  const callApi = async (prompt: string) => {
-    const res = await fetch('/api/motion/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
-    })
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error || 'API error')
-    return json.text as string
+  const loadHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await fetch('/api/history?tool=motionprompt&limit=20', { cache: 'no-store' })
+      const json = await res.json()
+      if (res.ok) setHistoryItems(json.items || [])
+      else toast({ variant: 'destructive', title: 'Gagal memuat riwayat', description: json?.error || 'Coba lagi nanti.' })
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Gagal memuat riwayat', description: e?.message || 'Coba lagi nanti.' })
+    } finally {
+      setHistoryLoading(false)
+    }
   }
+
+  const openHistoryDetail = async (id: string) => {
+    try {
+      const res = await fetch(`/api/history/${id}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Gagal memuat detail')
+      setHistoryDetail(json.item)
+      setHistoryDetailOpen(true)
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Coba lagi.' })
+    }
+  }
+
+  const exportHistoryTxt = (item: any) => {
+    const scenes = item?.response_json?.scenes || []
+    const header = [
+      '=== Motion Prompt (Indonesia) ===',
+      `Mata Pelajaran: ${item.subject || '-'}`,
+      `Jenjang: ${item.grade || '-'}`,
+      `Gaya: ${item.style || '-'}`,
+      `Materi: ${item.topic || '-'}`,
+      `Tujuan Pembelajaran: ${learningObjective || '-'}`,
+      `Jumlah Adegan: ${scenes.length}`,
+      '',
+    ].join('\n')
+    const lines: string[] = []
+    scenes.forEach((s: any) => {
+      lines.push('-----------------')
+      lines.push(` Scene ${s.scene}`)
+      lines.push('-----------------')
+      const d = s.prompt_detail_id || {}
+      Object.keys(keyMapId).forEach((k) => {
+        lines.push(`${keyMapId[k]}:`)
+        lines.push(String(d[k] || '-'))
+        lines.push('')
+      })
+    })
+    const content = header + lines.join('\n')
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const name = `history-motionprompt-${(item.topic || 'prompt').toLowerCase().replace(/[^a-z0-9-_]+/g, '-')}-${scenes.length}scene-${new Date(item.created_at).toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`
+    const a = document.createElement('a')
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+  }
+
+  const loadHistoryIntoForm = (item: any) => {
+    setSubject(item.subject || '')
+    setGrade(item.grade || 'PAUD/TK')
+    setStyle((item.style as any) || '3D Animation')
+    setLearningObjective(item?.response_json?.learningObjective || learningObjective)
+    setTopic(item.topic || '')
+    setStory(item.story || '')
+    setNegative(item.negative || '')
+    const scenesLoaded = item?.response_json?.scenes || []
+    if (Array.isArray(scenesLoaded) && scenesLoaded.length) {
+      setScenes(scenesLoaded)
+      setTotalRequested(scenesLoaded.length)
+    }
+    setHistoryDetailOpen(false)
+    toast({ title: 'Dimuat', description: 'Riwayat dimuat ke form.' })
+  }
+
+
+
+    type CallApiOpts = {
+    endpoint?: string;              // default /api/motion/generate
+    model?: string;                 // default gemini-2.5-flash-lite
+    preset?: 'veo' | 'raw';         // default veo
+    temperature?: number;           // default 0.6
+    maxTokens?: number;             // default 512
+    timeoutMs?: number;             // default 15000
+    };
+
+    async function callApi(prompt: string, opts: CallApiOpts = {}): Promise<string> {
+    const {
+        endpoint = '/api/motion/generate',
+        model = 'gemini-2.5-flash-lite',
+        preset = 'veo',
+        temperature = 0.6,
+        maxTokens = 512,
+        timeoutMs = 15000
+    } = opts;
+
+    if (!prompt || !prompt.trim()) throw new Error('Prompt kosong.');
+
+    const controller = new AbortController();
+    const kill = setTimeout(() => controller.abort(), timeoutMs);
+
+    const payload = {
+        prompt,
+        stream: false,                // paksa non-stream
+        preset,
+        model,
+        temperature,
+        maxTokens
+    } as const;
+
+    const doFetch = async () =>
+        fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+        signal: controller.signal
+        });
+
+    try {
+            let res = await doFetch();
+            if (!res.ok && (res.status === 429 || res.status >= 500)) {
+            await new Promise(r => setTimeout(r, 600)); // backoff pendek
+            res = await doFetch();
+            }
+
+            let json: any = null;
+            try { json = await res.json(); } catch { /* ignore */ }
+
+            if (!res.ok) {
+            const msg =
+                json?.error ||
+                (res.status === 429
+                ? 'Rate limit. Coba lagi.'
+                : `API error ${res.status}`);
+            throw new Error(msg);
+            }
+
+            const text: string | undefined = json?.text;
+            if (!text) throw new Error('AI tidak mengembalikan hasil.');
+
+            // Optional: metrik server
+            const tt = res.headers.get('X-TT');
+            if (tt) console.debug('Gemini TT(ms):', tt);
+
+            return text;
+        } catch (err: any) {
+            if (err?.name === 'AbortError') throw new Error('Timeout. Coba lagi.');
+            throw err;
+        } finally {
+            clearTimeout(kill);
+        }
+    }
+
 
   const showError = (message: string) => {
     toast({ variant: 'destructive', title: 'Terjadi Kesalahan', description: message })
@@ -126,10 +275,79 @@ OUTPUT_FORMAT: Strict JSON only.
     const prompt = buildGeneratePrompt(start, num)
     const text = await callApi(prompt)
     const parsed = extractJSON(text)
-    const newScenes: SceneDetail[] = parsed?.scenes || []
+    let newScenes: SceneDetail[] = Array.isArray(parsed?.scenes) ? (parsed.scenes as SceneDetail[]) : []
+    // Fallback: some models return `shots` instead of `scenes`. Map it to our schema.
+    if ((!newScenes || newScenes.length === 0) && Array.isArray((parsed as any)?.shots)) {
+      const shots: any[] = (parsed as any).shots
+      newScenes = shots.map((shot, i) => {
+        const desc = String(shot?.prompt || shot?.description || '-').trim()
+        const makeDetail = (lang: 'id' | 'en') => ({
+          visual_style: style,
+          core_scene_description: desc || '-',
+          cinematography: '-',
+          lighting_and_color: '-',
+          dialogue_and_audio: '-',
+          educational_focus: learningObjective || '-',
+          final_instructions: `Ensure the scene is engaging and age-appropriate for ${grade} students. ${negative || ''}`.trim(),
+        })
+        return {
+          scene: start + i,
+          prompt_detail_id: makeDetail('id'),
+          prompt_detail_en: makeDetail('en'),
+        }
+      })
+      if (newScenes.length) {
+        toast({ title: 'Format diadaptasi', description: 'Model mengirim format shots; sudah dipetakan ke scenes.' })
+      }
+    }
     setScenes((prev) => [...prev, ...newScenes])
+    // Log history (best-effort)
+    try {
+      await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool_key: 'motionprompt',
+          subject,
+          grade,
+          style,
+          topic,
+          story,
+          negative,
+          scene_count: newScenes.length,
+          model: 'gemini-2.5-flash-preview-05-20',
+          prompt,
+          response_json: { scenes: newScenes },
+          response_text: text,
+          status: newScenes.length > 0 ? 'ok' : 'error',
+        }),
+      })
+    } catch {}
     return newScenes.length > 0
   }
+
+  // Prefill from history (if exists)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mp_history_prefill')
+      if (!raw) return
+      localStorage.removeItem('mp_history_prefill')
+      const item = JSON.parse(raw)
+      if (!item) return
+      setSubject(item.subject || '')
+      setGrade(item.grade || 'PAUD/TK')
+      setStyle((item.style as any) || '3D Animation')
+      setTopic(item.topic || '')
+      setStory(item.story || '')
+      setNegative(item.negative || '')
+      const scenesLoaded = item?.response_json?.scenes || []
+      if (Array.isArray(scenesLoaded) && scenesLoaded.length) {
+        setScenes(scenesLoaded)
+        setTotalRequested(scenesLoaded.length)
+      }
+      toast({ title: 'Riwayat dimuat', description: 'Data riwayat dimuat ke form.' })
+    } catch {}
+  }, [])
 
   const handleGenerate = async () => {
     if (!learningObjective.trim()) return showError('Tujuan Pembelajaran wajib diisi.')
@@ -446,15 +664,8 @@ OUTPUT_FORMAT: Strict JSON only.
                   <RotateCcw className="mr-2 h-4 w-4" />
                   <span className="">Reset Form</span>
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300"
-                  disabled={loading}
-                  onClick={() => toast({ title: 'Belum tersedia', description: 'Riwayat Prompt belum diimplementasikan.' })}
-                >
-                  <History className="mr-2 h-4 w-4" />
-                  <span className="">Riwayat Prompt</span>
+                <Button asChild type="button" variant="secondary" className="w-full sm:w-auto min-w-[180px] rounded-2xl bg-gradient-to-r from-blue-200 to-purple-200 text-indigo-700 border border-indigo-300" disabled={loading}>
+                  <Link href="/history"><span className="inline-flex items-center"><History className="mr-2 h-4 w-4" /> Riwayat Prompt</span></Link>
                 </Button>
               </div>
             </CardContent>
@@ -484,6 +695,93 @@ OUTPUT_FORMAT: Strict JSON only.
             <div className="text-right">
               <Button className="rounded-2xl" onClick={() => { navigator.clipboard.writeText(imagePrompt); toast({ title: 'Disalin', description: 'Prompt gambar berhasil disalin.' }) }}>Salin</Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Riwayat Prompt Saya</DialogTitle>
+            </DialogHeader>
+            {historyLoading ? (
+              <div className="py-10 text-center text-muted-foreground">Memuat</div>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                {historyItems.length === 0 ? (
+                  <div className="py-6 text-center text-muted-foreground">Belum ada riwayat.</div>
+                ) : (
+                  historyItems.map((it) => (
+                    <div key={it.id} className="flex items-center justify-between rounded-xl border p-3">
+                      <div className="text-sm">
+                        <div className="font-medium">{new Date(it.created_at).toLocaleString('id-ID')}</div>
+                        <div className="text-muted-foreground">{it.tool_key}  {it.subject || '-'}  {it.grade || '-'}  {it.scene_count || 0} scene</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openHistoryDetail(it.id)}>Detail</Button>
+                        <Button size="sm" variant="destructive" className="rounded-xl" onClick={async () => {
+                          if (!confirm('Hapus riwayat ini?')) return
+                          try {
+                            const res = await fetch(`/api/history/${it.id}`, { method: 'DELETE' })
+                            const json = await res.json()
+                            if (!res.ok) throw new Error(json?.error || 'Gagal menghapus')
+                            setHistoryItems((arr) => arr.filter((x) => x.id !== it.id))
+                            toast({ title: 'Dihapus', description: 'Riwayat berhasil dihapus.' })
+                          } catch (e: any) {
+                            toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Coba lagi.' })
+                          }
+                        }}>Hapus</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* History Detail Dialog */}
+        <Dialog open={historyDetailOpen} onOpenChange={setHistoryDetailOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detail Riwayat</DialogTitle>
+            </DialogHeader>
+            {historyDetail ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border p-3 text-sm">
+                  <div><strong>Tanggal:</strong> {new Date(historyDetail.created_at).toLocaleString('id-ID')}</div>
+                  <div><strong>Mapel:</strong> {historyDetail.subject || '-'}</div>
+                  <div><strong>Jenjang:</strong> {historyDetail.grade || '-'}</div>
+                  <div><strong>Gaya:</strong> {historyDetail.style || '-'}</div>
+                  <div><strong>Materi:</strong> {historyDetail.topic || '-'}</div>
+                  {historyDetail.story ? <div><strong>Cerita:</strong> {historyDetail.story}</div> : null}
+                </div>
+                <div className="flex gap-2">
+                  <Button className="rounded-xl" onClick={() => exportHistoryTxt(historyDetail)}>Export TXT</Button>
+                  <Button className="rounded-xl" variant="secondary" onClick={() => loadHistoryIntoForm(historyDetail)}>Muat ke Form</Button>
+                </div>
+                <div className="space-y-2">
+                  {(historyDetail.response_json?.scenes || []).map((s: any) => (
+                    <div key={s.scene} className="rounded-xl border p-3">
+                      <div className="font-semibold">Scene {s.scene}</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div>
+                          {Object.keys(keyMapId).map((k) => (
+                            <p key={k} className="text-sm"><strong>{keyMapId[k]}:</strong> <span className="text-muted-foreground">{s?.prompt_detail_id?.[k] || '-'}</span></p>
+                          ))}
+                        </div>
+                        <div>
+                          {Object.keys(keyMapEn).map((k) => (
+                            <p key={k} className="text-sm"><strong>{keyMapEn[k]}:</strong> <span className="text-muted-foreground">{s?.prompt_detail_en?.[k] || '-'}</span></p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="py-10 text-center text-muted-foreground">Tidak ada data.</div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
