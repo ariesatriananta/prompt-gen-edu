@@ -22,7 +22,76 @@ export async function POST(req: Request) {
 
     const sceneLang = promptLanguage === 'EN' ? 'English' : 'Indonesian'
 
-    const prompt = `Based on the following story details, generate a multi-scene story outline.
+    const isEnhancedJson = String(promptLanguage).toUpperCase() === 'JSON'
+
+    const formatDurationID = (totalSeconds: number): string => {
+      if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '-'
+      const s = Math.floor(totalSeconds)
+      const hours = Math.floor(s / 3600)
+      const minutes = Math.floor((s % 3600) / 60)
+      const seconds = s % 60
+      const parts: string[] = []
+      if (hours > 0) parts.push(`${hours} jam`)
+      if (minutes > 0) parts.push(`${minutes} menit`)
+      if (seconds > 0 && hours === 0) parts.push(`${seconds} detik`)
+      if (parts.length === 0) return '0 detik'
+      return parts.join(' ')
+    }
+
+    const totalDurationStr = formatDurationID(numScenes * 8)
+    const prompt = isEnhancedJson
+      ? `You are a careful JSON generator. Based on the following story details, return a SINGLE JSON object with two top-level keys: "prompt_meta" and "scenes".
+STRICT RULES:
+- Output MUST be valid JSON and nothing else.
+- "scenes" MUST be an array with exactly ${numScenes} objects.
+- For text fields inside each scene, use ${sceneLang}. Dialogue lines must use ${conversationLanguage}.
+- Do NOT include markdown backticks.
+- Keep every field concise: beat_goal ≤ 1 sentence, visual_description ≤ 2 sentences, key_action ≤ 1 sentence, audio ≤ 1 short phrase, exit_state ≤ 1 sentence, dialog ≤ 1 short line. Do not add extra explanations.
+
+The JSON schema to follow exactly:
+{
+  "prompt_meta": {
+    "title": "string",
+    "genre": "string",
+    "target_audience": "Children",
+    "age_group": "${ageGroup} years old",
+    "core_value": "string",
+    "language": "${language}",
+    "total_duration": "${totalDurationStr}",
+    "total_scenes": ${numScenes},
+    "creation_date": "${new Date().toISOString().slice(0,10)}",
+
+    "animation_style": "3D Pixar-like, child-friendly, expressive faces",
+    "technical": { "aspect_ratio": "16:9", "fps": 30, "resolution": "3840x2160" },
+    "negative_prompt": "realistic gore, violence, blood, sharp teeth close-up, horror vibes, dark/gritty tone, excessive motion blur, shaky cam, text overlays, watermark, subtitles burned-in, brand logos, complex crowd scenes, night-time lighting, scary sound effects, blurry, distorted, watermark, subtitle, captions, unreadable letters, unclear letters, broken letters, messy letters, ugly, duplicate, morbid, mutilated, out of frame, poorly drawn, mutation, deformed, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, visible hair under hijab, incomplete hijab",
+    "final_instruction": "Render all scenes in consistent 3D Pixar-like style with soft lighting and warm colors. Keep each scene ~8 seconds. Ensure child-safe content, readable compositions, smooth camera moves (no shaky cam), and gentle transitions. Maintain character continuity and props across scenes. No on-screen text unless specified in dialog; keep faces expressive and friendly."
+  },
+  "scenes": [
+    {
+      "scene_number": 1,
+      "timecode": "0s–8s",
+      "duration": "8 detik",
+      "beat_goal": "string",
+      "visual_description": "string",
+      "key_action": "string",
+      "dialog": "string (can be empty)",
+      "audio": "string",
+      "exit_state": "string",
+      "transition": { "type": "cut|fade|dissolve|wipe", "to_scene": 2 },
+      "negative_prompt": "string (optional)"
+    }
+  ]
+}
+
+Story Details:
+- Title: ${storyIdea?.slice(0,50) || 'Untitled'}
+- Genre: ${genre}
+- Age Group: ${ageGroup}
+- Plot Idea: ${storyIdea}
+- Characters: ${characterDesc || 'Not specified, create creatively.'}
+- Core Value/Moral: ${moralLesson || 'Not specified, create creatively.'}
+Return ONLY the JSON.`
+      : `Based on the following story details, generate a multi-scene story outline.
 Generate a valid JSON array with exactly ${numScenes} scene objects.
 CRITICAL INSTRUCTIONS FOR LANGUAGE:
 1. All string values for keys "beat", "visual", "aksi", "audio", "exit", and "transisi" MUST be in ${sceneLang}.
@@ -39,38 +108,197 @@ Story Details:
 - Moral Lesson: ${moralLesson || 'Not specified, create creatively.'}
 Return ONLY the JSON array.`
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const modelToUse = isEnhancedJson && model === 'gemini-2.5-flash-lite' ? 'gemini-2.5-flash' : model
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json',
-        },
-      }),
-      cache: 'no-store',
-      signal: controller.signal,
-    })
-    clearTimeout(timeout)
-
-    if (!res.ok) {
-      const raw = await res.text()
-      const msg = res.status === 429 ? 'Batas penggunaan tercapai. Coba lagi.' : `Gemini error ${res.status}: ${raw}`
-      return NextResponse.json({ error: msg }, { status: 502 })
+    const looseParse = (raw: string): any | null => {
+      try { return JSON.parse(raw) } catch {}
+      try {
+        const cleaned = raw
+          .replace(/^```[a-zA-Z]*\n?/,'')
+          .replace(/```\s*$/,'')
+          .trim()
+        const start = cleaned.indexOf('{')
+        const end = cleaned.lastIndexOf('}')
+        if (start !== -1 && end !== -1 && end > start) {
+          const inner = cleaned.slice(start, end + 1)
+          return JSON.parse(inner)
+        }
+        const aStart = cleaned.indexOf('[')
+        const aEnd = cleaned.lastIndexOf(']')
+        if (aStart !== -1 && aEnd !== -1 && aEnd > aStart) {
+          const innerA = cleaned.slice(aStart, aEnd + 1)
+          return JSON.parse(innerA)
+        }
+      } catch {}
+      return null
     }
-    const data = await res.json()
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) return NextResponse.json({ error: 'AI tidak mengembalikan hasil.' }, { status: 502 })
-    let scenes: any = null
-    try { scenes = JSON.parse(text) } catch {}
-    if (!Array.isArray(scenes)) return NextResponse.json({ error: 'Format AI tidak valid.' }, { status: 502, headers: { 'x-ai-text': encodeURIComponent(text || '') } })
-    return NextResponse.json({ scenes })
+    const callGemini = async (promptText: string) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 60000)
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.35,
+            maxOutputTokens: isEnhancedJson ? 6144 : 2048,
+            responseMimeType: 'application/json',
+          },
+        }),
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      if (!res.ok) {
+        const raw = await res.text()
+        const msg = res.status === 429 ? 'Batas penggunaan tercapai. Coba lagi.' : `Gemini error ${res.status}`
+        throw { message: msg, raw }
+      }
+      const data = await res.json()
+      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
+      if (!text) throw { message: 'AI tidak mengembalikan hasil.' }
+      return text
+    }
+
+    const pick = (obj: any, key: string) => (obj && typeof obj === 'object' ? obj[key] : undefined)
+
+    if (isEnhancedJson) {
+      const chunkSize = 10
+      const allScenes: any[] = []
+      let meta: any = null
+
+      for (let offset = 0; offset < numScenes; offset += chunkSize) {
+        const count = Math.min(chunkSize, numScenes - offset)
+        const enhancedPrompt = `You are a careful JSON generator. CONTINUE generating a SINGLE JSON object with two keys: "prompt_meta" and "scenes".
+STRICT RULES:
+- Output MUST be valid JSON ONLY (no markdown fences or explanations).
+- Return exactly ${count} NEW scene objects in the "scenes" array for scene numbers ${offset + 1}..${offset + count} (inclusive) of ${numScenes} total.
+- Language: use ${sceneLang} for all non-dialog fields; dialogue text in ${conversationLanguage}.
+- Keep fields concise: beat_goal ≤ 1 sentence; visual_description ≤ 2 sentences; key_action ≤ 1 sentence; audio ≤ short phrase; exit_state ≤ 1 sentence; dialog ≤ 1 short line.
+
+SCENE OBJECT SHAPE (exact keys and their order are recommended):
+{
+  "scene_number": number,
+  "timecode": "${offset}s–${offset + 8}s" | "Xs–Ys",
+  "duration": "8 detik",
+  "beat_goal": "...",
+  "visual_description": "...",
+  "key_action": "...",
+  "dialog": "...",
+  "audio": "...",
+  "exit_state": "...",
+  "transition": { "type": "cut|fade|dissolve|wipe", "to_scene": number },
+  "negative_prompt": "..." (optional)
+}
+
+META (include once; if not included, it's fine — server has defaults):
+{
+  "prompt_meta": {
+    "title": "${(storyIdea || 'Untitled').slice(0,80)}",
+    "genre": "${genre}",
+    "target_audience": "Children",
+    "age_group": "${ageGroup} years old",
+    "core_value": "${moralLesson || ''}",
+    "language": "${language}",
+    "total_duration": "${numScenes * 8} detik",
+    "total_scenes": ${numScenes},
+    "creation_date": "${new Date().toISOString().slice(0,10)}",
+    "animation_style": "3D Pixar-like, child-friendly, expressive faces",
+    "technical": { "aspect_ratio": "16:9", "fps": 30, "resolution": "3840x2160" },
+    "negative_prompt": "realistic gore, violence, blood, sharp teeth close-up, horror vibes, dark/gritty tone, excessive motion blur, shaky cam, text overlays, watermark, subtitles burned-in, brand logos, complex crowd scenes, night-time lighting, scary sound effects, blurry, distorted, watermark, subtitle, captions, unreadable letters, unclear letters, broken letters, messy letters, ugly, duplicate, morbid, mutilated, out of frame, poorly drawn, mutation, deformed, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, visible hair under hijab, incomplete hijab",
+    "final_instruction": "Render all scenes in consistent 3D Pixar-like style with soft lighting and warm colors. Keep each scene ~8 seconds. Ensure child-safe content, readable compositions, smooth camera moves (no shaky cam), and gentle transitions. Maintain character continuity and props across scenes. No on-screen text unless specified in dialog; keep faces expressive and friendly."
+  }
+}
+
+Story Details (context, do not echo back outside JSON):
+- Title: ${storyIdea?.slice(0,50) || 'Untitled'}
+- Genre: ${genre}
+- Age Group: ${ageGroup}
+- Plot Idea: ${storyIdea}
+- Characters: ${characterDesc || 'Not specified, create creatively.'}
+- Core Value/Moral: ${moralLesson || 'Not specified, create creatively.'}
+Return ONLY the JSON.`
+
+        let text: string
+        try { text = await callGemini(enhancedPrompt) } catch (err: any) {
+          return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+        }
+        const parsed: any = looseParse(text)
+        let scenes = pick(parsed, 'scenes') || pick(parsed, 'Scenes') || pick(parsed?.data || {}, 'scenes') || (Array.isArray(parsed) ? parsed : undefined)
+        if (!Array.isArray(scenes)) {
+          return NextResponse.json({ error: 'Format Enhanced JSON tidak valid.', raw_ai_text: text }, { status: 502, headers: { 'x-ai-text': encodeURIComponent(text || '') } })
+        }
+        if (!meta) meta = pick(parsed, 'prompt_meta') || pick(parsed, 'meta') || pick(parsed, 'promptMeta') || null
+        allScenes.push(...scenes)
+      }
+
+      // Normalize numbering/timecodes and meta totals
+      const merged = allScenes.slice(0, numScenes).map((s, i) => {
+        const start = i * 8
+        const end = (i + 1) * 8
+        const timecode = `${start}s–${end}s`
+        const toScene = i + 2 <= numScenes ? i + 2 : i + 1
+        const transitionRaw: any = typeof s?.transition === 'object' ? s.transition : null
+        const transition = {
+          type: String(transitionRaw?.type || 'cut'),
+          to_scene: Number.isFinite(transitionRaw?.to_scene) ? transitionRaw.to_scene : toScene,
+        }
+        return {
+          scene_number: i + 1,
+          timecode,
+          duration: '8 detik',
+          beat_goal: String(s?.beat_goal || s?.beat || ''),
+          visual_description: String(s?.visual_description || s?.visual || ''),
+          key_action: String(s?.key_action || s?.aksi || ''),
+          dialog: String(s?.dialog || ''),
+          audio: String(s?.audio || ''),
+          exit_state: String(s?.exit_state || s?.exit || ''),
+          transition,
+          ...(s?.negative_prompt ? { negative_prompt: String(s.negative_prompt) } : {}),
+        }
+      })
+
+      if (!meta) {
+        meta = {
+          title: String((storyIdea || 'Untitled')).slice(0, 80),
+          genre,
+          target_audience: 'Children',
+          age_group: `${ageGroup} years old`,
+          core_value: moralLesson || '',
+          language,
+          total_duration: `${formatDurationID(merged.length * 8)}`,
+          total_scenes: merged.length,
+          creation_date: new Date().toISOString().slice(0, 10),
+          animation_style: '3D Pixar-like, child-friendly, expressive faces',
+          technical: { aspect_ratio: '16:9', fps: 30, resolution: '3840x2160' },
+          negative_prompt:
+            'realistic gore, violence, blood, sharp teeth close-up, horror vibes, dark/gritty tone, excessive motion blur, shaky cam, text overlays, watermark, subtitles burned-in, brand logos, complex crowd scenes, night-time lighting, scary sound effects, blurry, distorted, watermark, subtitle, captions, unreadable letters, unclear letters, broken letters, messy letters, ugly, duplicate, morbid, mutilated, out of frame, poorly drawn, mutation, deformed, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, visible hair under hijab, incomplete hijab',
+          final_instruction:
+            'Render all scenes in consistent 3D Pixar-like style with soft lighting and warm colors. Keep each scene ~8 seconds. Ensure child-safe content, readable compositions, smooth camera moves (no shaky cam), and gentle transitions. Maintain character continuity and props across scenes. No on-screen text unless specified in dialog; keep faces expressive and friendly.',
+        }
+      } else {
+        meta.total_scenes = merged.length
+        meta.total_duration = `${formatDurationID(merged.length * 8)}`
+      }
+
+      return NextResponse.json({ scenes: merged, prompt_meta: meta })
+    }
+
+    // Non-enhanced path: single call returns array of simple scenes
+    let text: string
+    try { text = await callGemini(prompt) } catch (err: any) {
+      return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+    }
+    try {
+      const parsed: any = looseParse(text)
+      if (Array.isArray(parsed)) return NextResponse.json({ scenes: parsed })
+      if (parsed && Array.isArray(parsed.scenes)) return NextResponse.json({ scenes: parsed.scenes })
+      return NextResponse.json({ error: 'Format AI tidak valid.', raw_ai_text: text }, { status: 502 })
+    } catch {
+      return NextResponse.json({ error: 'Respon AI bukan JSON valid.', raw_ai_text: text }, { status: 502, headers: { 'x-ai-text': encodeURIComponent(text || '') } })
+    }
   } catch (e: any) {
     const aborted = e?.name === 'AbortError'
     return NextResponse.json({ error: aborted ? 'Permintaan timeout. Coba lagi.' : e?.message || 'Internal error' }, { status: 500 })
