@@ -135,7 +135,7 @@ Return ONLY the JSON array.`
     }
     const callGemini = async (promptText: string) => {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 60000)
+      const timeout = setTimeout(() => controller.abort(), 90000)
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,14 +157,16 @@ Return ONLY the JSON array.`
         throw { message: msg, raw }
       }
       const data = await res.json()
-      const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
+      const parts: any[] = data?.candidates?.[0]?.content?.parts || []
+      const text: string | undefined = parts.map((p: any) => p?.text || '').join('') || data?.candidates?.[0]?.content?.parts?.[0]?.text
       if (!text) throw { message: 'AI tidak mengembalikan hasil.' }
       return text
     }
 
     const pick = (obj: any, key: string) => (obj && typeof obj === 'object' ? obj[key] : undefined)
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-    if (isEnhancedJson) {
+    if (isEnhancedJson && numScenes > 10) {
       const chunkSize = 10
       const allScenes: any[] = []
       let meta: any = null
@@ -221,12 +223,24 @@ Story Details (context, do not echo back outside JSON):
 - Core Value/Moral: ${moralLesson || 'Not specified, create creatively.'}
 Return ONLY the JSON.`
 
-        let text: string
-        try { text = await callGemini(enhancedPrompt) } catch (err: any) {
-          return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+        let parsed: any = null
+        let scenes: any[] | null = null
+        let text = ''
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            text = await callGemini(enhancedPrompt)
+          } catch (err: any) {
+            if (attempt >= 3) {
+              return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+            }
+            await sleep(500 * attempt)
+            continue
+          }
+          parsed = looseParse(text)
+          scenes = (pick(parsed, 'scenes') || pick(parsed, 'Scenes') || pick(parsed?.data || {}, 'scenes') || (Array.isArray(parsed) ? parsed : undefined)) as any[] | null
+          if (Array.isArray(scenes)) break
+          if (attempt < 3) await sleep(600 * attempt)
         }
-        const parsed: any = looseParse(text)
-        let scenes = pick(parsed, 'scenes') || pick(parsed, 'Scenes') || pick(parsed?.data || {}, 'scenes') || (Array.isArray(parsed) ? parsed : undefined)
         if (!Array.isArray(scenes)) {
           return NextResponse.json({ error: 'Format Enhanced JSON tidak valid.', raw_ai_text: text }, { status: 502, headers: { 'x-ai-text': encodeURIComponent(text || '') } })
         }
@@ -286,19 +300,69 @@ Return ONLY the JSON.`
       return NextResponse.json({ scenes: merged, prompt_meta: meta })
     }
 
-    // Non-enhanced path: single call returns array of simple scenes
-    let text: string
-    try { text = await callGemini(prompt) } catch (err: any) {
-      return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+    // Non-enhanced path (EN/ID): apply batching when >10 scenes
+    if (!isEnhancedJson && numScenes > 10) {
+      const chunkSize = 10
+      const allScenes: any[] = []
+      for (let offset = 0; offset < numScenes; offset += chunkSize) {
+        const count = Math.min(chunkSize, numScenes - offset)
+        const batchPrompt = `Based on the following story details, generate a valid JSON array with EXACTLY ${count} scene objects.
+CRITICAL LANGUAGE:
+- All values for keys "beat", "visual", "aksi", "audio", "exit", and "transisi" MUST be in ${sceneLang}.
+- The value for key "dialog" MUST be in ${conversationLanguage}. If no dialogue, use empty string.
+STRUCTURE per item (exact keys): { "beat": "string", "visual": "string", "aksi": "string", "dialog": "string", "audio": "string", "exit": "string", "transisi": "string" }.
+Do NOT include markdown fences or explanations.
+Context:
+- Genre: ${genre}
+- Target Audience: ${ageGroup} years old
+- Plot Idea: ${storyIdea}
+- Characters: ${characterDesc || 'Not specified, create creatively.'}
+- Moral Lesson: ${moralLesson || 'Not specified, create creatively.'}
+Return ONLY the JSON array.`
+
+        let parsed: any = null
+        let scenes: any[] | null = null
+        let text = ''
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            text = await callGemini(batchPrompt)
+          } catch (err: any) {
+            if (attempt >= 3) {
+              return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+            }
+            await sleep(500 * attempt)
+            continue
+          }
+          parsed = looseParse(text)
+          if (Array.isArray(parsed)) { scenes = parsed; break }
+          if (parsed && Array.isArray(parsed.scenes)) { scenes = parsed.scenes; break }
+          if (attempt < 3) await sleep(600 * attempt)
+        }
+        if (!Array.isArray(scenes)) {
+          return NextResponse.json({ error: 'Format AI tidak valid.', raw_ai_text: text }, { status: 502 })
+        }
+        allScenes.push(...scenes)
+      }
+      return NextResponse.json({ scenes: allScenes.slice(0, numScenes) })
     }
-    try {
+
+    // Non-enhanced path: single call returns array of simple scenes, with retries
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let text: string
+      try {
+        text = await callGemini(prompt)
+      } catch (err: any) {
+        if (attempt >= 3) return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+        await sleep(500 * attempt)
+        continue
+      }
       const parsed: any = looseParse(text)
       if (Array.isArray(parsed)) return NextResponse.json({ scenes: parsed })
       if (parsed && Array.isArray(parsed.scenes)) return NextResponse.json({ scenes: parsed.scenes })
-      return NextResponse.json({ error: 'Format AI tidak valid.', raw_ai_text: text }, { status: 502 })
-    } catch {
-      return NextResponse.json({ error: 'Respon AI bukan JSON valid.', raw_ai_text: text }, { status: 502, headers: { 'x-ai-text': encodeURIComponent(text || '') } })
+      if (attempt < 3) await sleep(600 * attempt)
+      else return NextResponse.json({ error: 'Format AI tidak valid.', raw_ai_text: text }, { status: 502 })
     }
+    return NextResponse.json({ error: 'Format AI tidak valid.' }, { status: 502 })
   } catch (e: any) {
     const aborted = e?.name === 'AbortError'
     return NextResponse.json({ error: aborted ? 'Permintaan timeout. Coba lagi.' : e?.message || 'Internal error' }, { status: 500 })

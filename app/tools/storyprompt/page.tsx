@@ -400,9 +400,9 @@ export default function StorypromptPage() {
             <CardHeader><CardTitle>Hasil Prompt Detail</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {stat('Scene', scenes.length? String(scenes.length):'-')}
-                {stat('Durasi', scenes.length? `${scenes.length*8} detik`:'-')}
-                {stat('Dibuat', scenes.length? new Date().toLocaleDateString('id-ID'):'-')}
+                {stat('Scene', scenes.length ? String(scenes.length) : '-')}
+                {stat('Durasi', scenes.length ? formatDurationID(scenes.length * 8) : '-')}
+                {stat('Dibuat', scenes.length ? new Date().toLocaleDateString('id-ID') : '-')}
                 {stat('Genre', genre || '-')}
               </div>
               <Separator />
