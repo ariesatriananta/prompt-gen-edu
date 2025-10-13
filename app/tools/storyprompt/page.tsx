@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { Loader2, History, Wand2, Lightbulb, Dice5, Download, ImageIcon } from 'lucide-react'
+import { Loader2, History, Wand2, Lightbulb, Dice5, Download, ImageIcon, CheckCircle, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 type Scene = {
@@ -615,11 +615,60 @@ export default function StorypromptPage() {
         </div>
 
         <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
-          <DialogContent className="rounded-2xl sm:max-w-xl">
-            <DialogHeader><DialogTitle>Analisis Kelayakan</DialogTitle></DialogHeader>
-            {analysis? (
-              <pre className="bg-muted p-3 rounded-xl text-xs whitespace-pre-wrap">{JSON.stringify(analysis,null,2)}</pre>
-            ): (
+          <DialogContent className="rounded-2xl sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-center">Laporan Analisis Kelayakan</DialogTitle>
+            </DialogHeader>
+            {analysis ? (
+              <div className="space-y-4">
+                {analysis?.summary ? (
+                  <p className="text-center text-sm text-muted-foreground">{analysis.summary}</p>
+                ) : null}
+                <div>
+                  <div className="mb-1 text-sm font-medium">Skor Keseluruhan: {Number(analysis.overall_score) || 0}/10</div>
+                  <div className="h-2 w-full rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-green-500 to-yellow-400"
+                      style={{ width: `${Math.min(100, Math.max(0, (Number(analysis.overall_score) || 0) * 10))}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border bg-emerald-50 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-emerald-700">
+                      <CheckCircle className="h-4 w-4" />
+                      <span className="font-semibold">Kekuatan</span>
+                    </div>
+                    <ul className="list-disc pl-4 text-sm text-emerald-700">
+                      {Array.isArray(analysis?.strengths) ? analysis.strengths.map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      )) : null}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border bg-amber-50 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-amber-700">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="font-semibold">Kelemahan</span>
+                    </div>
+                    <ul className="list-disc pl-4 text-sm text-amber-700">
+                      {Array.isArray(analysis?.weaknesses) ? analysis.weaknesses.map((w: string, i: number) => (
+                        <li key={i}>{w}</li>
+                      )) : null}
+                    </ul>
+                  </div>
+                </div>
+                {Array.isArray(analysis?.recommendations) && analysis.recommendations.length > 0 ? (
+                  <div className="rounded-xl border p-3">
+                    <div className="mb-1 font-semibold">Rekomendasi</div>
+                    <ul className="list-disc pl-4 text-sm text-muted-foreground">
+                      {analysis.recommendations.map((r: string, i: number) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
               <div className="py-10 text-center text-muted-foreground">Memuat...</div>
             )}
           </DialogContent>
