@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,7 +21,7 @@ type Item = {
 }
 
 export default function HistoryPage() {
-  const [tool, setTool] = useState('motionprompt')
+  const [tool, setTool] = useState('storyprompt')
   const [q, setQ] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
@@ -64,8 +64,17 @@ export default function HistoryPage() {
       const res = await fetch(`/api/history/${id}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Gagal memuat detail')
-      localStorage.setItem('mp_history_prefill', JSON.stringify(json.item))
-      router.push('/tools/motionprompt')
+      const item = json.item || {}
+      const toolKey = (item.tool_key || '').toLowerCase()
+      if (toolKey === 'storyprompt') {
+        try { localStorage.setItem('story_history_prefill', JSON.stringify(item)) } catch {}
+        router.push('/tools/storyprompt')
+      } else if (toolKey === 'motionprompt') {
+        try { localStorage.setItem('mp_history_prefill', JSON.stringify(item)) } catch {}
+        router.push('/tools/motionprompt')
+      } else {
+        router.push(`/history/${id}`)
+      }
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Coba lagi.' })
     }
@@ -84,54 +93,56 @@ export default function HistoryPage() {
           </div>
         </div>
 
-      <Card className="p-4 space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <div>
-            <label className="block text-sm mb-1">Tool</label>
-            <Select value={tool} onValueChange={setTool}>
-              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="motionprompt">MotionPrompt</SelectItem>
-              </SelectContent>
-            </Select>
+        <Card className="p-4 space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <div>
+              <label className="block text-sm mb-1">Tool</label>
+              <Select value={tool} onValueChange={setTool}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="storyprompt">StoryPrompt</SelectItem>
+                  <SelectItem value="motionprompt">MotionPrompt</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Cari Materi</label>
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="misal: daur air" className="rounded-xl" />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Mulai</label>
+              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="rounded-xl" />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Sampai</label>
+              <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded-xl" />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm mb-1">Cari Materi</label>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="misal: daur air" className="rounded-xl" />
+          <div className="flex gap-2">
+            <Button className="rounded-xl" onClick={() => load(false)} disabled={loading}>Terapkan</Button>
+            <Button className="rounded-xl" variant="outline" onClick={() => { setQ(''); setStart(''); setEnd(''); setFrom(0); load(false) }} disabled={loading}>Reset</Button>
           </div>
-          <div>
-            <label className="block text-sm mb-1">Mulai</label>
-            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="rounded-xl" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Sampai</label>
-            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded-xl" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button className="rounded-xl" onClick={() => load(false)} disabled={loading}>Terapkan</Button>
-          <Button className="rounded-xl" variant="outline" onClick={() => { setQ(''); setStart(''); setEnd(''); setFrom(0); load(false) }} disabled={loading}>Reset</Button>
-        </div>
-      </Card>
+        </Card>
 
         <div className="space-y-2">
           {items.map((it) => (
             <div key={it.id} className="flex items-center justify-between rounded-xl border p-3">
-            <div className="text-sm">
+              <div className="text-sm">
                 <div className="font-medium">{new Date(it.created_at).toLocaleString('id-ID')}</div>
                 <div className="text-muted-foreground">{it.tool_key} • {it.subject || '-'} • {it.grade || '-'} • {it.scene_count || 0} scene • {it.topic || '-'}</div>
-            </div>
-            <div className="flex items-center gap-2">
+              </div>
+              <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openDetail(it.id)}>Detail</Button>
                 <Button size="sm" className="rounded-xl" onClick={() => loadIntoForm(it.id)}>Muat ke Form</Button>
-            </div>
+              </div>
             </div>
           ))}
         </div>
         <div className="text-center">
-          <Button variant="secondary" className="rounded-xl" onClick={() => load(true)} disabled={loading}>{loading ? 'Memuat…' : 'Load More'}</Button>
+          <Button variant="secondary" className="rounded-xl" onClick={() => load(true)} disabled={loading}>{loading ? 'Memuat...' : 'Load More'}</Button>
         </div>
       </main>
     </section>
   )
 }
+

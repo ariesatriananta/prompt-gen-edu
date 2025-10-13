@@ -50,6 +50,11 @@ export default function StorypromptPage() {
   const [errorContent, setErrorContent] = useState('')
   const [imageOpen, setImageOpen] = useState(false)
   const [imagePrompt, setImagePrompt] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyItems, setHistoryItems] = useState<any[]>([])
+  const [historyDetailOpen, setHistoryDetailOpen] = useState(false)
+  const [historyDetail, setHistoryDetail] = useState<any | null>(null)
 
   const callApi = async (path: string, payload: any) => {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -289,6 +294,117 @@ export default function StorypromptPage() {
     setImageOpen(true)
   }
 
+  const loadHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const res = await fetch('/api/history?tool=storyprompt&limit=20', { cache: 'no-store' })
+      const json = await res.json()
+      if (res.ok) setHistoryItems(json.items || [])
+      else toast({ variant: 'destructive', title: 'Gagal memuat riwayat', description: json?.error || 'Coba lagi nanti.' })
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Gagal memuat riwayat', description: e?.message || 'Coba lagi nanti.' })
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openHistoryDetail = async (id: string) => {
+    try {
+      const res = await fetch(`/api/history/${id}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Gagal memuat detail')
+      setHistoryDetail(json.item)
+      setHistoryDetailOpen(true)
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Gagal', description: e?.message || 'Coba lagi.' })
+    }
+  }
+
+  const exportHistory = (item: any) => {
+    const rr = item?.response_json || {}
+    if (rr?.prompt_meta) {
+      // Enhanced JSON → ekspor JSON
+      const content = JSON.stringify(rr, null, 2)
+      const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const name = `history-storyprompt-enhanced-${(item.topic || 'story').toLowerCase().replace(/[^a-z0-9-_]+/g,'-')}-${(rr?.scenes||[]).length}scene-${new Date(item.created_at).toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`
+      const a = document.createElement('a')
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+      return
+    }
+    // EN/ID → ekspor TXT
+    const scenesArr = Array.isArray(rr?.scenes) ? rr.scenes : []
+    const isEN = item?.language === 'EN'
+    const L = {
+      style: isEN ? 'A. VISUAL STYLE' : 'A. GAYA VISUAL',
+      beat: isEN ? 'B. BEAT/GOAL' : 'B. BEAT/TUJUAN',
+      visual: isEN ? 'C. VISUAL DESCRIPTION' : 'C. DESKRIPSI VISUAL',
+      action: isEN ? 'D. KEY ACTION' : 'D. AKSI UTAMA',
+      dialogue: isEN ? 'E. DIALOGUE' : 'E. DIALOG',
+      audio: isEN ? 'F. AUDIO' : 'F. AUDIO',
+      exit: isEN ? 'G. EXIT STATE' : 'G. EXIT STATE',
+      transition: isEN ? 'H. TRANSITION' : 'H. TRANSISI',
+      stability: isEN ? 'I. STABILITY & ANATOMY INSTRUCTION' : 'I. INSTRUKSI STABILITAS & ANATOMI',
+      negative: isEN ? 'J. NEGATIVE PROMPT/FINAL INSTRUCTION' : 'J. NEGATIVE PROMPT/FINAL INSTRUCTION',
+    }
+    const stabilityText = isEN
+      ? 'Maintain consistent character proportions and clean anatomy (hands, fingers, limbs, face). Avoid deformation, extra limbs, floating parts, and perspective warping. Keep camera stable; no excessive motion blur or shaky cam.'
+      : 'Jaga proporsi karakter konsisten dan anatomi bersih (tangan, jari, anggota tubuh, wajah). Hindari deformasi, anggota tubuh berlebih, bagian mengambang, dan distorsi perspektif. Kamera stabil; tanpa motion blur berlebihan atau shaky cam.'
+    const header = [
+      '=== Story Prompt Export (History) ===',
+      `Judul/Topik: ${item.topic || '-'}`,
+      `Genre: ${item.style || genre}`,
+      `Kelompok Usia: ${item.grade || ageGroup}`,
+      `Jumlah Scene: ${scenesArr.length}`,
+      `Tanggal: ${new Date(item.created_at).toLocaleString('id-ID')}`,
+      '====================================',
+      '',
+    ].join('\n')
+    const lines: string[] = []
+    scenesArr.forEach((s: any, i: number) => {
+      lines.push('-----------------')
+      lines.push(` Scene ${i + 1}`)
+      lines.push('-----------------')
+      lines.push(`${L.style}:\n${s?.style || '-'}`)
+      lines.push('')
+      lines.push(`${L.beat}:\n${s?.beat || s?.beat_goal || '-'}`)
+      lines.push('')
+      lines.push(`${L.visual}:\n${s?.visual || s?.visual_description || '-'}`)
+      lines.push('')
+      lines.push(`${L.action}:\n${s?.aksi || s?.key_action || '-'}`)
+      lines.push('')
+      lines.push(`${L.dialogue}:\n${s?.dialog || '-'}`)
+      lines.push('')
+      lines.push(`${L.audio}:\n${s?.audio || '-'}`)
+      lines.push('')
+      lines.push(`${L.exit}:\n${s?.exit || s?.exit_state || '-'}`)
+      lines.push('')
+      lines.push(`${L.transition}:\n${s?.transisi || (s?.transition ? `${s.transition?.type || '-'}${s?.transition?.to_scene ? ` → ${s.transition.to_scene}` : ''}` : '-')}`)
+      lines.push('')
+      lines.push(`${L.stability}:\n${s?.stability || stabilityText}`)
+      lines.push('')
+      lines.push(`${L.negative}:\n${s?.negative || s?.negative_prompt || '-'}`)
+      lines.push('')
+    })
+    const content = header + lines.join('\n')
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const name = `history-storyprompt-${(item.topic || 'story').toLowerCase().replace(/[^a-z0-9-_]+/g,'-')}-${scenesArr.length}scene-${new Date(item.created_at).toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`
+    const a = document.createElement('a')
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+  }
+
+  const loadHistoryIntoForm = (item: any) => {
+    setGenre(item.style || genre)
+    setAgeGroup(item.grade || ageGroup)
+    setStoryIdea(item.topic || storyIdea)
+    setCharacterDesc(item.story || characterDesc)
+    const arr = item?.response_json?.scenes || []
+    if (Array.isArray(arr) && arr.length) setScenes(arr)
+    setHistoryDetailOpen(false)
+    toast({ title: 'Dimuat', description: 'Riwayat dimuat ke form.' })
+  }
+
   const handleScript = async () => {
     if (!storyIdea.trim()) return toast({ variant: 'destructive', title: 'Lengkapi data', description: 'Jelaskan ide plot terlebih dahulu.' })
     setScriptOpen(true)
@@ -484,7 +600,14 @@ export default function StorypromptPage() {
                 <Button onClick={handleScript} className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 text-white">Buat Naskah Lengkap dengan AI</Button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Button asChild variant="secondary" className="rounded-2xl"><Link href="/history?tool=storyprompt"><History className="h-4 w-4 mr-2"/>Riwayat Prompt</Link></Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="rounded-2xl"
+                  onClick={() => { setHistoryOpen(true); loadHistory() }}
+                >
+                  <History className="h-4 w-4 mr-2"/>Riwayat Prompt
+                </Button>
                 <Button variant="outline" className="rounded-2xl" onClick={handleAnalyze}>Analisis Kelayakan</Button>
               </div>
             </CardContent>
@@ -502,6 +625,73 @@ export default function StorypromptPage() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Riwayat Prompt Saya</DialogTitle>
+            </DialogHeader>
+            {historyLoading ? (
+              <div className="py-10 text-center text-muted-foreground">Memuat...</div>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto space-y-2">
+                {historyItems.length === 0 ? (
+                  <div className="py-6 text-center text-muted-foreground">Belum ada riwayat.</div>
+                ) : (
+                  historyItems.map((it) => (
+                    <div key={it.id} className="flex items-center justify-between rounded-xl border p-3">
+                      <div className="text-sm">
+                        <div className="font-medium">{new Date(it.created_at).toLocaleString('id-ID')}</div>
+                        <div className="text-muted-foreground">{it.tool_key} • {it.grade || '-'} • {it.scene_count || 0} scene</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openHistoryDetail(it.id)}>Detail</Button>
+                        <Button size="sm" className="rounded-xl" onClick={() => exportHistory(it)}>Unduh</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={historyDetailOpen} onOpenChange={setHistoryDetailOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Detail Riwayat</DialogTitle>
+            </DialogHeader>
+            {historyDetail ? (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">{new Date(historyDetail.created_at).toLocaleString('id-ID')}</div>
+                {historyDetail?.response_json?.prompt_meta ? (
+                  <pre className="bg-muted p-3 rounded-xl text-xs whitespace-pre-wrap">{JSON.stringify(historyDetail.response_json, null, 2)}</pre>
+                ) : (
+                  <div className="space-y-2">
+                    {(historyDetail?.response_json?.scenes || []).map((s: any, idx: number) => (
+                      <div key={idx} className="rounded-xl border p-3">
+                        <div className="font-semibold">Scene {idx + 1}</div>
+                        <p className="text-sm"><strong>Beat:</strong> <span className="text-muted-foreground">{s?.beat || s?.beat_goal || '-'}</span></p>
+                        <p className="text-sm"><strong>Visual:</strong> <span className="text-muted-foreground">{s?.visual || s?.visual_description || '-'}</span></p>
+                        <p className="text-sm"><strong>Aksi:</strong> <span className="text-muted-foreground">{s?.aksi || s?.key_action || '-'}</span></p>
+                        <p className="text-sm"><strong>Dialog:</strong> <span className="text-muted-foreground">{s?.dialog || '-'}</span></p>
+                        <p className="text-sm"><strong>Audio:</strong> <span className="text-muted-foreground">{s?.audio || '-'}</span></p>
+                        <p className="text-sm"><strong>Exit:</strong> <span className="text-muted-foreground">{s?.exit || s?.exit_state || '-'}</span></p>
+                        <p className="text-sm"><strong>Transisi:</strong> <span className="text-muted-foreground">{s?.transisi || (s?.transition ? `${s.transition?.type || '-'}${s?.transition?.to_scene ? ` → ${s.transition.to_scene}` : ''}` : '-')}</span></p>
+                        <p className="text-sm"><strong>Stability:</strong> <span className="text-muted-foreground">{s?.stability || '-'}</span></p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button variant="secondary" className="rounded-xl" onClick={() => exportHistory(historyDetail)}>Unduh</Button>
+                  <Button variant="outline" className="rounded-xl" onClick={() => loadHistoryIntoForm(historyDetail)}>Muat ke Form</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-10 text-center text-muted-foreground">Tidak ada data.</div>
+            )}
+          </DialogContent>
+        </Dialog>
         <Dialog open={sceneDialogOpen} onOpenChange={setSceneDialogOpen}>
           <DialogContent className="rounded-2xl sm:max-w-xl max-h-[80vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Detail Prompt Scene</DialogTitle></DialogHeader>

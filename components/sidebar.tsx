@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Home, Grid, ChevronDown, Wand2, X, Search, Settings } from "lucide-react"
+import { Home, Grid, ChevronDown, Wand2, X, Search, Settings, History } from "lucide-react"
 
 type SidebarGroup = {
   title: string
@@ -32,6 +32,7 @@ const sidebarItems: SidebarGroup[] = [
         { title: "PlayPrompt", url: "/tools/playprompt" },
     ],
   },
+  { title: "Riwayat Prompt", icon: <History /> },
   { title: "User Management", icon: <Settings /> },
 ]
 
@@ -140,6 +141,9 @@ export function Sidebar({ allowedKeys = [], role }: { allowedKeys?: string[]; ro
                       if (item.title === 'Home') {
                         window.location.href = '/'
                         setMobileMenuOpen(false)
+                      } else if (item.title === 'Riwayat Prompt') {
+                        window.location.href = '/history'
+                        setMobileMenuOpen(false)
                       } else if (item.title === 'User Management') {
                         window.location.href = '/admin/users'
                         setMobileMenuOpen(false)
@@ -220,6 +224,8 @@ export function Sidebar({ allowedKeys = [], role }: { allowedKeys?: string[]; ro
                     onClick={() => {
                       if (item.title === 'Home') {
                         window.location.href = '/'
+                      } else if (item.title === 'Riwayat Prompt') {
+                        window.location.href = '/history'
                       } else if (item.title === 'User Management') {
                         window.location.href = '/admin/users'
                       } else if (item.items) {
