@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { Loader2, History, Wand2, Lightbulb, Dice5, Download } from 'lucide-react'
+import { Loader2, History, Wand2, Lightbulb, Dice5, Download, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 
 type Scene = {
@@ -22,6 +22,7 @@ type Scene = {
   transisi: string
   style?: string
   negative?: string
+  stability?: string
 }
 
 export default function StorypromptPage() {
@@ -47,6 +48,8 @@ export default function StorypromptPage() {
   const [jsonDialogOpen, setJsonDialogOpen] = useState(false)
   const [errorOpen, setErrorOpen] = useState(false)
   const [errorContent, setErrorContent] = useState('')
+  const [imageOpen, setImageOpen] = useState(false)
+  const [imagePrompt, setImagePrompt] = useState('')
 
   const callApi = async (path: string, payload: any) => {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -116,17 +119,21 @@ export default function StorypromptPage() {
     ].join('\n')
 
     const isEN = promptLanguage === 'EN'
-    const L = {
-      style: isEN ? 'A. VISUAL STYLE' : 'A. GAYA VISUAL',
-      beat: isEN ? 'B. BEAT/GOAL' : 'B. BEAT/TUJUAN',
-      visual: isEN ? 'C. VISUAL DESCRIPTION' : 'C. DESKRIPSI VISUAL',
-      action: isEN ? 'D. KEY ACTION' : 'D. AKSI UTAMA',
-      dialogue: isEN ? 'E. DIALOGUE' : 'E. DIALOG',
-      audio: isEN ? 'F. AUDIO' : 'F. AUDIO',
-      exit: isEN ? 'G. EXIT STATE' : 'G. EXIT STATE',
-      transition: isEN ? 'H. TRANSITION' : 'H. TRANSISI',
-      negative: 'I. NEGATIVE PROMPT/FINAL INSTRUCTION',
-    }
+      const L = {
+        style: isEN ? 'A. VISUAL STYLE' : 'A. GAYA VISUAL',
+        beat: isEN ? 'B. BEAT/GOAL' : 'B. BEAT/TUJUAN',
+        visual: isEN ? 'C. VISUAL DESCRIPTION' : 'C. DESKRIPSI VISUAL',
+        action: isEN ? 'D. KEY ACTION' : 'D. AKSI UTAMA',
+        dialogue: isEN ? 'E. DIALOGUE' : 'E. DIALOG',
+        audio: isEN ? 'F. AUDIO' : 'F. AUDIO',
+        exit: isEN ? 'G. EXIT STATE' : 'G. EXIT STATE',
+        transition: isEN ? 'H. TRANSITION' : 'H. TRANSISI',
+        stability: isEN ? 'I. STABILITY & ANATOMY INSTRUCTION' : 'I. INSTRUKSI STABILITAS & ANATOMI',
+        negative: isEN ? 'J. NEGATIVE PROMPT/FINAL INSTRUCTION' : 'J. NEGATIVE PROMPT/FINAL INSTRUCTION',
+      }
+    const stabilityText = isEN
+      ? 'Maintain consistent character proportions and clean anatomy (hands, fingers, limbs, face). Avoid deformation, extra limbs, floating parts, and perspective warping. Keep camera stable; no excessive motion blur or shaky cam.'
+      : 'Jaga proporsi karakter konsisten dan anatomi bersih (tangan, jari, anggota tubuh, wajah). Hindari deformasi, anggota tubuh berlebih, bagian mengambang, dan distorsi perspektif. Kamera stabil; tanpa motion blur berlebihan atau shaky cam.'
     const lines: string[] = []
     scenes.forEach((s, i) => {
       lines.push('-----------------')
@@ -147,6 +154,8 @@ export default function StorypromptPage() {
       lines.push(`${L.exit}:\n${s.exit}`)
       lines.push('')
       lines.push(`${L.transition}:\n${s.transisi}`)
+      lines.push('')
+      lines.push(`${L.stability}:\n${s.stability || stabilityText}`)
       lines.push('')
       lines.push(`${L.negative}:\n${s.negative || '-'}`)
       lines.push('')
@@ -234,6 +243,7 @@ export default function StorypromptPage() {
           ...s,
           style: (raw as any).style || (useEN ? fallbackStyleEN : fallbackStyleID),
           negative: (raw as any).negative || (useEN ? fallbackNegativeEN : fallbackNegativeID),
+          stability: (raw as any).stability || s.stability,
         }
       })
       setScenes(normalized)
@@ -265,6 +275,20 @@ export default function StorypromptPage() {
     }
   }
 
+  const openImagePrompt = (s: Scene) => {
+    const isEN = promptLanguage === 'EN'
+    const ratio = '16:9'
+    const styleText = s.style || (isEN ? '3D Pixar-like, child-friendly, expressive faces' : 'Gaya 3D ala Pixar, ramah anak, ekspresi wajah kaya')
+    const join = (a?: string, b?: string) => [a?.trim(), b?.trim()].filter(Boolean).join(', ')
+    const desc = join(s.visual, s.aksi)
+    const tail = isEN
+      ? 'in the style of a children\'s educational animation, cinematic lighting, high detail, masterpiece'
+      : 'gaya animasi edukasi anak, pencahayaan sinematik, detail tinggi, kualitas terbaik'
+    const text = `${desc}, ${styleText}, ${tail}, aspect ratio ${ratio}`
+    setImagePrompt(text)
+    setImageOpen(true)
+  }
+
   const handleScript = async () => {
     if (!storyIdea.trim()) return toast({ variant: 'destructive', title: 'Lengkapi data', description: 'Jelaskan ide plot terlebih dahulu.' })
     setScriptOpen(true)
@@ -288,8 +312,12 @@ export default function StorypromptPage() {
       audio: isEN ? 'F. AUDIO' : 'F. AUDIO',
       exit: isEN ? 'G. EXIT STATE' : 'G. EXIT STATE',
       transition: isEN ? 'H. TRANSITION' : 'H. TRANSISI',
-      negative: isEN ? 'I. NEGATIVE PROMPT/FINAL INSTRUCTION' : 'I. NEGATIVE PROMPT/FINAL INSTRUCTION',
+      stability: isEN ? 'I. STABILITY & ANATOMY INSTRUCTION' : 'I. INSTRUKSI STABILITAS & ANATOMI',
+      negative: isEN ? 'J. NEGATIVE PROMPT/FINAL INSTRUCTION' : 'J. NEGATIVE PROMPT/FINAL INSTRUCTION',
     }
+    const stabilityText = isEN
+      ? 'Maintain consistent character proportions and clean anatomy (hands, fingers, limbs, face). Avoid deformation, extra limbs, floating parts, and perspective warping. Keep camera stable; no excessive motion blur or shaky cam.'
+      : 'Jaga proporsi karakter konsisten dan anatomi bersih (tangan, jari, anggota tubuh, wajah). Hindari deformasi, anggota tubuh berlebih, bagian mengambang, dan distorsi perspektif. Kamera stabil; tanpa motion blur berlebihan atau shaky cam.'
     return [
       `${L.style}: ${s.style || '-'}`,
       `${L.beat}:\n${s.beat}`,
@@ -299,6 +327,7 @@ export default function StorypromptPage() {
       `${L.audio}:\n${s.audio}`,
       `${L.exit}:\n${s.exit}`,
       `${L.transition}:\n${s.transisi}`,
+      `${L.stability}:\n${stabilityText}`,
       `${L.negative}:\n${s.negative || '-'}`,
     ].join('\n')
   }
@@ -429,9 +458,14 @@ export default function StorypromptPage() {
                       <div key={idx} className="rounded-2xl border bg-card p-4 shadow-sm bg-gradient-to-b from-purple-600/15 via-blue-600/10 to-background">
                         <h3 className="text-lg font-semibold">Scene {idx+1}</h3>
                         <p className="mt-1 text-xs text-muted-foreground">Durasi 8 Detik</p>
-                        <div className="mt-4 flex gap-2">
-                          <Button variant="default" className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={()=>{ setSelectedScene(s); setSceneDialogText(buildSceneText(s)); setSceneDialogOpen(true) }}>Lihat Prompt</Button>
-                        </div>
+                      <div className="mt-4 space-y-2">
+                        <Button variant="default" className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white" onClick={()=>{ setSelectedScene(s); setSceneDialogText(buildSceneText(s)); setSceneDialogOpen(true) }}>Lihat Prompt</Button>
+                        {promptLanguage !== 'JSON' ? (
+                          <Button variant="outline" className="w-full rounded-xl" onClick={()=> openImagePrompt(s)}>
+                            <ImageIcon className="mr-2 h-4 w-4" /> Prompt Gambar
+                          </Button>
+                        ) : null}
+                      </div>
                       </div>
                     ))}
                   </div>
@@ -469,7 +503,7 @@ export default function StorypromptPage() {
         </Dialog>
 
         <Dialog open={sceneDialogOpen} onOpenChange={setSceneDialogOpen}>
-          <DialogContent className="rounded-2xl sm:max-w-xl">
+          <DialogContent className="rounded-2xl sm:max-w-xl max-h-[80vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Detail Prompt Scene</DialogTitle></DialogHeader>
             {selectedScene ? (
               <div className="space-y-2 text-sm">
@@ -481,7 +515,8 @@ export default function StorypromptPage() {
                 <p><strong>F. AUDIO:</strong><br/> {selectedScene.audio}</p>
                 <p><strong>G. EXIT STATE:</strong><br/> {selectedScene.exit}</p>
                 <p><strong>{promptLanguage==='EN'?'H. TRANSITION':'H. TRANSISI'}:</strong><br/> {selectedScene.transisi}</p>
-                <p><strong>I. NEGATIVE PROMPT/FINAL INSTRUCTION:</strong><br/> {selectedScene.negative || '-'}</p>
+                <p><strong>{promptLanguage==='EN'?'I. STABILITY & ANATOMY INSTRUCTION':'I. INSTRUKSI STABILITAS & ANATOMI'}:</strong><br/> {selectedScene.stability || (promptLanguage==='EN' ? 'Maintain consistent character proportions and clean anatomy (hands, fingers, limbs, face). Avoid deformation, extra limbs, floating parts, and perspective warping. Keep camera stable; no excessive motion blur or shaky cam.' : 'Jaga proporsi karakter konsisten dan anatomi bersih (tangan, jari, anggota tubuh, wajah). Hindari deformasi, anggota tubuh berlebih, bagian mengambang, dan distorsi perspektif. Kamera stabil; tanpa motion blur berlebihan atau shaky cam.')}</p>
+                <p><strong>J. NEGATIVE PROMPT/FINAL INSTRUCTION:</strong><br/> {selectedScene.negative || '-'}</p>
               </div>
             ) : null}
             <div className="text-right">
@@ -514,6 +549,16 @@ export default function StorypromptPage() {
           <DialogContent className="rounded-2xl sm:max-w-xl">
             <DialogHeader><DialogTitle>Naskah Lengkap</DialogTitle></DialogHeader>
             <pre className="bg-muted p-3 rounded-xl text-xs whitespace-pre-wrap">{scriptText}</pre>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+          <DialogContent className="rounded-2xl sm:max-w-xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Prompt Gambar</DialogTitle></DialogHeader>
+            <Textarea readOnly value={imagePrompt} className="h-40 bg-muted" />
+            <div className="text-right">
+              <Button className="rounded-2xl" onClick={() => { navigator.clipboard.writeText(imagePrompt); toast({ title: 'Disalin', description: 'Prompt gambar berhasil disalin.' }) }}>Salin</Button>
+            </div>
           </DialogContent>
         </Dialog>
 

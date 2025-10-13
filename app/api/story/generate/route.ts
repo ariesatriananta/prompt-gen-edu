@@ -97,8 +97,10 @@ CRITICAL INSTRUCTIONS FOR LANGUAGE:
 1. All string values for keys "beat", "visual", "aksi", "audio", "exit", and "transisi" MUST be in ${sceneLang}.
 2. The string value for the "dialog" key MUST be in ${conversationLanguage}. If no dialogue is needed, the value must be an empty string.
 
-Each object in the array MUST follow this exact structure:
-{ "beat": "string", "visual": "string", "aksi": "string", "dialog": "string", "audio": "string", "exit": "string", "transisi": "string" }.
+Each object in the array MUST follow this exact structure (exact keys):
+{ "beat": "string", "visual": "string", "aksi": "string", "dialog": "string", "audio": "string", "exit": "string", "transisi": "string", "stability": "string" }.
+
+Where "stability" is a short instruction to keep anatomy clean and camera stable (e.g., hands/fingers correct, no extra limbs, no shaky cam).
 
 Story Details:
 - Genre: ${genre}
@@ -300,6 +302,47 @@ Return ONLY the JSON.`
       return NextResponse.json({ scenes: merged, prompt_meta: meta })
     }
 
+    // Enhanced JSON path (≤10 scenes): single call with retries
+    if (isEnhancedJson) {
+      let text = ''
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          text = await callGemini(prompt)
+        } catch (err: any) {
+          if (attempt >= 3) return NextResponse.json({ error: err?.message || 'Gagal memanggil AI', raw_ai_text: err?.raw || '' }, { status: 502 })
+          await sleep(500 * attempt)
+          continue
+        }
+        const parsed: any = looseParse(text)
+        const scenes = (pick(parsed, 'scenes') || pick(parsed, 'Scenes') || (Array.isArray(parsed) ? parsed : undefined)) as any[] | undefined
+        let meta = pick(parsed, 'prompt_meta') || pick(parsed, 'promptMeta') || pick(parsed, 'meta') || null
+        if (Array.isArray(scenes)) {
+          if (!meta) {
+            meta = {
+              title: String((storyIdea || 'Untitled')).slice(0, 80),
+              genre,
+              target_audience: 'Children',
+              age_group: `${ageGroup} years old`,
+              core_value: moralLesson || '',
+              language,
+              total_duration: `${formatDurationID((scenes as any[]).length * 8)}`,
+              total_scenes: (scenes as any[]).length,
+              creation_date: new Date().toISOString().slice(0, 10),
+              animation_style: '3D Pixar-like, child-friendly, expressive faces',
+              technical: { aspect_ratio: '16:9', fps: 30, resolution: '3840x2160' },
+              negative_prompt:
+                'realistic gore, violence, blood, sharp teeth close-up, horror vibes, dark/gritty tone, excessive motion blur, shaky cam, text overlays, watermark, subtitles burned-in, brand logos, complex crowd scenes, night-time lighting, scary sound effects, blurry, distorted, watermark, subtitle, captions, unreadable letters, unclear letters, broken letters, messy letters, ugly, duplicate, morbid, mutilated, out of frame, poorly drawn, mutation, deformed, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, visible hair under hijab, incomplete hijab',
+              final_instruction:
+                'Render all scenes in consistent 3D Pixar-like style with soft lighting and warm colors. Keep each scene ~8 seconds. Ensure child-safe content, readable compositions, smooth camera moves (no shaky cam), and gentle transitions. Maintain character continuity and props across scenes. No on-screen text unless specified in dialog; keep faces expressive and friendly.',
+            }
+          }
+          return NextResponse.json({ scenes, prompt_meta: meta })
+        }
+        if (attempt < 3) await sleep(600 * attempt)
+        else return NextResponse.json({ error: 'Format Enhanced JSON tidak valid.', raw_ai_text: text }, { status: 502 })
+      }
+    }
+
     // Non-enhanced path (EN/ID): apply batching when >10 scenes
     if (!isEnhancedJson && numScenes > 10) {
       const chunkSize = 10
@@ -310,7 +353,8 @@ Return ONLY the JSON.`
 CRITICAL LANGUAGE:
 - All values for keys "beat", "visual", "aksi", "audio", "exit", and "transisi" MUST be in ${sceneLang}.
 - The value for key "dialog" MUST be in ${conversationLanguage}. If no dialogue, use empty string.
-STRUCTURE per item (exact keys): { "beat": "string", "visual": "string", "aksi": "string", "dialog": "string", "audio": "string", "exit": "string", "transisi": "string" }.
+STRUCTURE per item (exact keys): { "beat": "string", "visual": "string", "aksi": "string", "dialog": "string", "audio": "string", "exit": "string", "transisi": "string", "stability": "string" }.
+"stability" should be a short instruction like: maintain correct anatomy (hands/fingers/limbs/face), avoid deformations/extra limbs, keep camera stable (no shaky cam), minimal motion blur.
 Do NOT include markdown fences or explanations.
 Context:
 - Genre: ${genre}
